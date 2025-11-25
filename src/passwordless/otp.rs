@@ -50,6 +50,7 @@
 //!     .with_max_attempts(3);            // 最多尝试 3 次
 //! ```
 
+use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -289,9 +290,10 @@ struct OtpKey {
 /// OTP 存储接口
 ///
 /// 实现此 trait 以提供自定义的存储后端（如 Redis、数据库等）
+#[async_trait]
 pub trait OtpStore: Send + Sync {
     /// 保存 OTP
-    fn save(
+    async fn save(
         &self,
         identifier: &str,
         purpose: OtpPurpose,
@@ -301,23 +303,23 @@ pub trait OtpStore: Send + Sync {
     ) -> Result<()>;
 
     /// 获取 OTP
-    fn get(&self, identifier: &str, purpose: OtpPurpose) -> Result<Option<StoredOtp>>;
+    async fn get(&self, identifier: &str, purpose: OtpPurpose) -> Result<Option<StoredOtp>>;
 
     /// 更新剩余尝试次数
-    fn decrement_attempts(&self, identifier: &str, purpose: OtpPurpose) -> Result<()>;
+    async fn decrement_attempts(&self, identifier: &str, purpose: OtpPurpose) -> Result<()>;
 
     /// 删除 OTP
-    fn delete(&self, identifier: &str, purpose: OtpPurpose) -> Result<()>;
+    async fn delete(&self, identifier: &str, purpose: OtpPurpose) -> Result<()>;
 
     /// 获取最后一次生成时间
-    fn get_last_generated(
+    async fn get_last_generated(
         &self,
         identifier: &str,
         purpose: OtpPurpose,
     ) -> Result<Option<DateTime<Utc>>>;
 
     /// 清理过期的 OTP
-    fn cleanup_expired(&self) -> Result<usize>;
+    async fn cleanup_expired(&self) -> Result<usize>;
 }
 
 // ============================================================================
@@ -351,8 +353,9 @@ impl InMemoryOtpStore {
     }
 }
 
+#[async_trait]
 impl OtpStore for InMemoryOtpStore {
-    fn save(
+    async fn save(
         &self,
         identifier: &str,
         purpose: OtpPurpose,
@@ -377,7 +380,7 @@ impl OtpStore for InMemoryOtpStore {
         Ok(())
     }
 
-    fn get(&self, identifier: &str, purpose: OtpPurpose) -> Result<Option<StoredOtp>> {
+    async fn get(&self, identifier: &str, purpose: OtpPurpose) -> Result<Option<StoredOtp>> {
         let records = self.records.read().unwrap();
         let key = OtpKey {
             identifier: identifier.to_string(),
@@ -386,7 +389,7 @@ impl OtpStore for InMemoryOtpStore {
         Ok(records.get(&key).cloned())
     }
 
-    fn decrement_attempts(&self, identifier: &str, purpose: OtpPurpose) -> Result<()> {
+    async fn decrement_attempts(&self, identifier: &str, purpose: OtpPurpose) -> Result<()> {
         let mut records = self.records.write().unwrap();
         let key = OtpKey {
             identifier: identifier.to_string(),
@@ -398,7 +401,7 @@ impl OtpStore for InMemoryOtpStore {
         Ok(())
     }
 
-    fn delete(&self, identifier: &str, purpose: OtpPurpose) -> Result<()> {
+    async fn delete(&self, identifier: &str, purpose: OtpPurpose) -> Result<()> {
         let mut records = self.records.write().unwrap();
         let key = OtpKey {
             identifier: identifier.to_string(),
@@ -408,7 +411,7 @@ impl OtpStore for InMemoryOtpStore {
         Ok(())
     }
 
-    fn get_last_generated(
+    async fn get_last_generated(
         &self,
         identifier: &str,
         purpose: OtpPurpose,
@@ -421,7 +424,7 @@ impl OtpStore for InMemoryOtpStore {
         Ok(records.get(&key).map(|r| r.created_at))
     }
 
-    fn cleanup_expired(&self) -> Result<usize> {
+    async fn cleanup_expired(&self) -> Result<usize> {
         let mut records = self.records.write().unwrap();
         let now = Utc::now();
         let before = records.len();
@@ -512,12 +515,17 @@ impl<S: OtpStore> OtpManager<S> {
     /// // 发送验证码给用户
     /// println!("请输入验证码: {}", otp.code);
     /// ```
-    pub fn generate(&self, identifier: impl Into<String>, purpose: OtpPurpose) -> Result<OtpData> {
+    pub async fn generate(
+        &self,
+        identifier: impl Into<String>,
+        purpose: OtpPurpose,
+    ) -> Result<OtpData> {
         let identifier = identifier.into();
 
         // 检查最小间隔
         if let Some(min_interval) = self.config.min_interval
-            && let Some(last_generated) = self.store.get_last_generated(&identifier, purpose)?
+            && let Some(last_generated) =
+                self.store.get_last_generated(&identifier, purpose).await?
         {
             let elapsed = Utc::now() - last_generated;
             let min_seconds = min_interval.as_secs() as i64;
@@ -532,7 +540,7 @@ impl<S: OtpStore> OtpManager<S> {
 
         // 如果不允许多个，先删除现有的
         if !self.config.allow_multiple {
-            self.store.delete(&identifier, purpose)?;
+            self.store.delete(&identifier, purpose).await?;
         }
 
         // 生成验证码
@@ -543,13 +551,15 @@ impl<S: OtpStore> OtpManager<S> {
         let expires_at = created_at + Duration::seconds(self.config.ttl.as_secs() as i64);
 
         // 保存
-        self.store.save(
-            &identifier,
-            purpose,
-            &code,
-            expires_at,
-            self.config.max_attempts,
-        )?;
+        self.store
+            .save(
+                &identifier,
+                purpose,
+                &code,
+                expires_at,
+                self.config.max_attempts,
+            )
+            .await?;
 
         Ok(OtpData {
             code,
@@ -596,33 +606,34 @@ impl<S: OtpStore> OtpManager<S> {
     /// // 验证码已被消费，再次验证会失败
     /// assert!(manager.verify("user@example.com", &otp.code, OtpPurpose::Login).is_err());
     /// ```
-    pub fn verify(&self, identifier: &str, code: &str, purpose: OtpPurpose) -> Result<()> {
+    pub async fn verify(&self, identifier: &str, code: &str, purpose: OtpPurpose) -> Result<()> {
         // 获取存储的 OTP
         let stored = self
             .store
-            .get(identifier, purpose)?
+            .get(identifier, purpose)
+            .await?
             .ok_or_else(|| Error::validation("no OTP found for this identifier and purpose"))?;
 
         // 检查是否过期
         if Utc::now() > stored.expires_at {
-            self.store.delete(identifier, purpose)?;
+            self.store.delete(identifier, purpose).await?;
             return Err(Error::validation("OTP has expired"));
         }
 
         // 检查剩余尝试次数
         if stored.remaining_attempts == 0 {
-            self.store.delete(identifier, purpose)?;
+            self.store.delete(identifier, purpose).await?;
             return Err(Error::validation("maximum attempts exceeded"));
         }
 
         // 使用常量时间比较验证码
         if !constant_time_compare_str(code, &stored.code) {
             // 减少尝试次数
-            self.store.decrement_attempts(identifier, purpose)?;
+            self.store.decrement_attempts(identifier, purpose).await?;
 
             let remaining = stored.remaining_attempts.saturating_sub(1);
             if remaining == 0 {
-                self.store.delete(identifier, purpose)?;
+                self.store.delete(identifier, purpose).await?;
                 return Err(Error::validation("invalid OTP, maximum attempts exceeded"));
             }
 
@@ -634,7 +645,7 @@ impl<S: OtpStore> OtpManager<S> {
 
         // 验证成功，根据配置决定是否删除
         if self.config.consume_on_verify {
-            self.store.delete(identifier, purpose)?;
+            self.store.delete(identifier, purpose).await?;
         }
 
         Ok(())
@@ -643,9 +654,9 @@ impl<S: OtpStore> OtpManager<S> {
     /// 检查是否可以生成新的 OTP
     ///
     /// 检查是否超过了最小生成间隔。
-    pub fn can_generate(&self, identifier: &str, purpose: OtpPurpose) -> Result<bool> {
+    pub async fn can_generate(&self, identifier: &str, purpose: OtpPurpose) -> Result<bool> {
         if let Some(min_interval) = self.config.min_interval
-            && let Some(last_generated) = self.store.get_last_generated(identifier, purpose)?
+            && let Some(last_generated) = self.store.get_last_generated(identifier, purpose).await?
         {
             let elapsed = Utc::now() - last_generated;
             let min_seconds = min_interval.as_secs() as i64;
@@ -655,9 +666,13 @@ impl<S: OtpStore> OtpManager<S> {
     }
 
     /// 获取距离可以重新生成的剩余秒数
-    pub fn seconds_until_can_generate(&self, identifier: &str, purpose: OtpPurpose) -> Result<i64> {
+    pub async fn seconds_until_can_generate(
+        &self,
+        identifier: &str,
+        purpose: OtpPurpose,
+    ) -> Result<i64> {
         if let Some(min_interval) = self.config.min_interval
-            && let Some(last_generated) = self.store.get_last_generated(identifier, purpose)?
+            && let Some(last_generated) = self.store.get_last_generated(identifier, purpose).await?
         {
             let elapsed = Utc::now() - last_generated;
             let min_seconds = min_interval.as_secs() as i64;
@@ -668,13 +683,13 @@ impl<S: OtpStore> OtpManager<S> {
     }
 
     /// 撤销 OTP
-    pub fn revoke(&self, identifier: &str, purpose: OtpPurpose) -> Result<()> {
-        self.store.delete(identifier, purpose)
+    pub async fn revoke(&self, identifier: &str, purpose: OtpPurpose) -> Result<()> {
+        self.store.delete(identifier, purpose).await
     }
 
     /// 清理过期的 OTP
-    pub fn cleanup(&self) -> Result<usize> {
-        self.store.cleanup_expired()
+    pub async fn cleanup(&self) -> Result<usize> {
+        self.store.cleanup_expired().await
     }
 
     /// 获取配置
@@ -689,12 +704,13 @@ mod tests {
     use std::thread::sleep;
     use std::time::Duration as StdDuration;
 
-    #[test]
-    fn test_generate_and_verify() {
+    #[tokio::test]
+    async fn test_generate_and_verify() {
         let manager = OtpManager::new(OtpConfig::default().with_min_interval(None));
 
         let otp = manager
             .generate("user@example.com", OtpPurpose::Login)
+            .await
             .unwrap();
         assert_eq!(otp.code.len(), 6);
         assert_eq!(otp.identifier, "user@example.com");
@@ -705,22 +721,25 @@ mod tests {
         assert!(
             manager
                 .verify("user@example.com", &otp.code, OtpPurpose::Login)
+                .await
                 .is_ok()
         );
     }
 
-    #[test]
-    fn test_otp_consumed_after_verify() {
+    #[tokio::test]
+    async fn test_otp_consumed_after_verify() {
         let manager = OtpManager::new(OtpConfig::default().with_min_interval(None));
 
         let otp = manager
             .generate("user@example.com", OtpPurpose::Login)
+            .await
             .unwrap();
 
         // 第一次验证成功
         assert!(
             manager
                 .verify("user@example.com", &otp.code, OtpPurpose::Login)
+                .await
                 .is_ok()
         );
 
@@ -728,12 +747,13 @@ mod tests {
         assert!(
             manager
                 .verify("user@example.com", &otp.code, OtpPurpose::Login)
+                .await
                 .is_err()
         );
     }
 
-    #[test]
-    fn test_otp_not_consumed_when_disabled() {
+    #[tokio::test]
+    async fn test_otp_not_consumed_when_disabled() {
         let config = OtpConfig::default()
             .with_consume_on_verify(false)
             .with_min_interval(None);
@@ -741,33 +761,38 @@ mod tests {
 
         let otp = manager
             .generate("user@example.com", OtpPurpose::Login)
+            .await
             .unwrap();
 
         // 多次验证都成功
         assert!(
             manager
                 .verify("user@example.com", &otp.code, OtpPurpose::Login)
+                .await
                 .is_ok()
         );
         assert!(
             manager
                 .verify("user@example.com", &otp.code, OtpPurpose::Login)
+                .await
                 .is_ok()
         );
     }
 
-    #[test]
-    fn test_wrong_code() {
+    #[tokio::test]
+    async fn test_wrong_code() {
         let manager = OtpManager::new(OtpConfig::default().with_min_interval(None));
 
         let otp = manager
             .generate("user@example.com", OtpPurpose::Login)
+            .await
             .unwrap();
 
         // 错误的验证码
         assert!(
             manager
                 .verify("user@example.com", "000000", OtpPurpose::Login)
+                .await
                 .is_err()
         );
 
@@ -775,12 +800,13 @@ mod tests {
         assert!(
             manager
                 .verify("user@example.com", &otp.code, OtpPurpose::Login)
+                .await
                 .is_ok()
         );
     }
 
-    #[test]
-    fn test_max_attempts() {
+    #[tokio::test]
+    async fn test_max_attempts() {
         let config = OtpConfig::default()
             .with_max_attempts(2)
             .with_min_interval(None);
@@ -788,12 +814,14 @@ mod tests {
 
         let otp = manager
             .generate("user@example.com", OtpPurpose::Login)
+            .await
             .unwrap();
 
         // 错误尝试 1
         assert!(
             manager
                 .verify("user@example.com", "000000", OtpPurpose::Login)
+                .await
                 .is_err()
         );
 
@@ -801,6 +829,7 @@ mod tests {
         assert!(
             manager
                 .verify("user@example.com", "000000", OtpPurpose::Login)
+                .await
                 .is_err()
         );
 
@@ -808,12 +837,13 @@ mod tests {
         assert!(
             manager
                 .verify("user@example.com", &otp.code, OtpPurpose::Login)
+                .await
                 .is_err()
         );
     }
 
-    #[test]
-    fn test_otp_expiration() {
+    #[tokio::test]
+    async fn test_otp_expiration() {
         let config = OtpConfig::default()
             .with_ttl(StdDuration::from_millis(100))
             .with_min_interval(None);
@@ -821,6 +851,7 @@ mod tests {
 
         let otp = manager
             .generate("user@example.com", OtpPurpose::Login)
+            .await
             .unwrap();
 
         // 等待过期
@@ -830,19 +861,22 @@ mod tests {
         assert!(
             manager
                 .verify("user@example.com", &otp.code, OtpPurpose::Login)
+                .await
                 .is_err()
         );
     }
 
-    #[test]
-    fn test_different_purposes_independent() {
+    #[tokio::test]
+    async fn test_different_purposes_independent() {
         let manager = OtpManager::new(OtpConfig::default().with_min_interval(None));
 
         let login_otp = manager
             .generate("user@example.com", OtpPurpose::Login)
+            .await
             .unwrap();
         let reset_otp = manager
             .generate("user@example.com", OtpPurpose::PasswordReset)
+            .await
             .unwrap();
 
         // 不同用途的验证码不能混用
@@ -853,11 +887,13 @@ mod tests {
                     &login_otp.code,
                     OtpPurpose::PasswordReset
                 )
+                .await
                 .is_err()
         );
         assert!(
             manager
                 .verify("user@example.com", &reset_otp.code, OtpPurpose::Login)
+                .await
                 .is_err()
         );
 
@@ -865,6 +901,7 @@ mod tests {
         assert!(
             manager
                 .verify("user@example.com", &login_otp.code, OtpPurpose::Login)
+                .await
                 .is_ok()
         );
         assert!(
@@ -874,24 +911,27 @@ mod tests {
                     &reset_otp.code,
                     OtpPurpose::PasswordReset
                 )
+                .await
                 .is_ok()
         );
     }
 
-    #[test]
-    fn test_min_interval() {
+    #[tokio::test]
+    async fn test_min_interval() {
         let config = OtpConfig::default().with_min_interval(Some(StdDuration::from_secs(1)));
         let manager = OtpManager::new(config);
 
         // 第一次生成成功
         manager
             .generate("user@example.com", OtpPurpose::Login)
+            .await
             .unwrap();
 
         // 立即再次生成失败
         assert!(
             manager
                 .generate("user@example.com", OtpPurpose::Login)
+                .await
                 .is_err()
         );
 
@@ -900,12 +940,13 @@ mod tests {
         assert!(
             manager
                 .generate("user@example.com", OtpPurpose::Login)
+                .await
                 .is_ok()
         );
     }
 
-    #[test]
-    fn test_code_length() {
+    #[tokio::test]
+    async fn test_code_length() {
         let config = OtpConfig::default()
             .with_code_length(8)
             .with_min_interval(None);
@@ -913,33 +954,37 @@ mod tests {
 
         let otp = manager
             .generate("user@example.com", OtpPurpose::Login)
+            .await
             .unwrap();
         assert_eq!(otp.code.len(), 8);
     }
 
-    #[test]
-    fn test_revoke() {
+    #[tokio::test]
+    async fn test_revoke() {
         let manager = OtpManager::new(OtpConfig::default().with_min_interval(None));
 
         let otp = manager
             .generate("user@example.com", OtpPurpose::Login)
+            .await
             .unwrap();
 
         // 撤销
         manager
             .revoke("user@example.com", OtpPurpose::Login)
+            .await
             .unwrap();
 
         // 验证失败
         assert!(
             manager
                 .verify("user@example.com", &otp.code, OtpPurpose::Login)
+                .await
                 .is_err()
         );
     }
 
-    #[test]
-    fn test_cleanup_expired() {
+    #[tokio::test]
+    async fn test_cleanup_expired() {
         let config = OtpConfig::default()
             .with_ttl(StdDuration::from_millis(100))
             .with_min_interval(None);
@@ -947,21 +992,23 @@ mod tests {
 
         manager
             .generate("user1@example.com", OtpPurpose::Login)
+            .await
             .unwrap();
         manager
             .generate("user2@example.com", OtpPurpose::Login)
+            .await
             .unwrap();
 
         // 等待过期
         sleep(StdDuration::from_millis(150));
 
         // 清理
-        let cleaned = manager.cleanup().unwrap();
+        let cleaned = manager.cleanup().await.unwrap();
         assert_eq!(cleaned, 2);
     }
 
-    #[test]
-    fn test_can_generate() {
+    #[tokio::test]
+    async fn test_can_generate() {
         let config = OtpConfig::default().with_min_interval(Some(StdDuration::from_secs(1)));
         let manager = OtpManager::new(config);
 
@@ -969,17 +1016,20 @@ mod tests {
         assert!(
             manager
                 .can_generate("user@example.com", OtpPurpose::Login)
+                .await
                 .unwrap()
         );
 
         manager
             .generate("user@example.com", OtpPurpose::Login)
+            .await
             .unwrap();
 
         // 生成后不能立即再生成
         assert!(
             !manager
                 .can_generate("user@example.com", OtpPurpose::Login)
+                .await
                 .unwrap()
         );
 
@@ -988,12 +1038,13 @@ mod tests {
         assert!(
             manager
                 .can_generate("user@example.com", OtpPurpose::Login)
+                .await
                 .unwrap()
         );
     }
 
-    #[test]
-    fn test_seconds_until_can_generate() {
+    #[tokio::test]
+    async fn test_seconds_until_can_generate() {
         let config = OtpConfig::default().with_min_interval(Some(StdDuration::from_secs(60)));
         let manager = OtpManager::new(config);
 
@@ -1001,17 +1052,20 @@ mod tests {
         assert_eq!(
             manager
                 .seconds_until_can_generate("user@example.com", OtpPurpose::Login)
+                .await
                 .unwrap(),
             0
         );
 
         manager
             .generate("user@example.com", OtpPurpose::Login)
+            .await
             .unwrap();
 
         // 生成后接近 60 秒
         let seconds = manager
             .seconds_until_can_generate("user@example.com", OtpPurpose::Login)
+            .await
             .unwrap();
         assert!(seconds > 55 && seconds <= 60);
     }
@@ -1039,8 +1093,8 @@ mod tests {
         assert_eq!(OtpPurpose::Custom(42).to_string(), "custom_42");
     }
 
-    #[test]
-    fn test_remaining_seconds() {
+    #[tokio::test]
+    async fn test_remaining_seconds() {
         let config = OtpConfig::default()
             .with_ttl(StdDuration::from_secs(300))
             .with_min_interval(None);
@@ -1048,14 +1102,15 @@ mod tests {
 
         let otp = manager
             .generate("user@example.com", OtpPurpose::Login)
+            .await
             .unwrap();
 
         let remaining = otp.remaining_seconds();
         assert!(remaining > 295 && remaining <= 300);
     }
 
-    #[test]
-    fn test_store_len_and_is_empty() {
+    #[tokio::test]
+    async fn test_store_len_and_is_empty() {
         let store = InMemoryOtpStore::new();
         assert!(store.is_empty());
         assert_eq!(store.len(), 0);
@@ -1068,6 +1123,7 @@ mod tests {
                 Utc::now() + Duration::hours(1),
                 3,
             )
+            .await
             .unwrap();
         assert!(!store.is_empty());
         assert_eq!(store.len(), 1);

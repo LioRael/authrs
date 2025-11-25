@@ -148,14 +148,15 @@ async fn test_magic_link_user_isolation() {
 // ============================================================================
 
 /// 测试基本的 OTP 生成和验证流程
-#[test]
-fn test_otp_basic_flow() {
+#[tokio::test]
+async fn test_otp_basic_flow() {
     let config = OtpConfig::default().with_min_interval(None);
     let manager = OtpManager::new(config);
 
     // 生成 OTP
     let otp = manager
         .generate("user@example.com", OtpPurpose::Login)
+        .await
         .unwrap();
 
     assert_eq!(otp.code.len(), 6);
@@ -167,24 +168,27 @@ fn test_otp_basic_flow() {
     assert!(
         manager
             .verify("user@example.com", &otp.code, OtpPurpose::Login)
+            .await
             .is_ok()
     );
 }
 
 /// 测试 OTP 一次性使用
-#[test]
-fn test_otp_single_use() {
+#[tokio::test]
+async fn test_otp_single_use() {
     let config = OtpConfig::default().with_min_interval(None);
     let manager = OtpManager::new(config);
 
     let otp = manager
         .generate("user@example.com", OtpPurpose::Login)
+        .await
         .unwrap();
 
     // 第一次验证成功
     assert!(
         manager
             .verify("user@example.com", &otp.code, OtpPurpose::Login)
+            .await
             .is_ok()
     );
 
@@ -192,13 +196,14 @@ fn test_otp_single_use() {
     assert!(
         manager
             .verify("user@example.com", &otp.code, OtpPurpose::Login)
+            .await
             .is_err()
     );
 }
 
 /// 测试 OTP 错误验证码
-#[test]
-fn test_otp_wrong_code() {
+#[tokio::test]
+async fn test_otp_wrong_code() {
     let config = OtpConfig::default()
         .with_min_interval(None)
         .with_max_attempts(5);
@@ -206,12 +211,14 @@ fn test_otp_wrong_code() {
 
     let otp = manager
         .generate("user@example.com", OtpPurpose::Login)
+        .await
         .unwrap();
 
     // 错误的验证码
     assert!(
         manager
             .verify("user@example.com", "000000", OtpPurpose::Login)
+            .await
             .is_err()
     );
 
@@ -219,13 +226,14 @@ fn test_otp_wrong_code() {
     assert!(
         manager
             .verify("user@example.com", &otp.code, OtpPurpose::Login)
+            .await
             .is_ok()
     );
 }
 
 /// 测试 OTP 最大尝试次数
-#[test]
-fn test_otp_max_attempts() {
+#[tokio::test]
+async fn test_otp_max_attempts() {
     let config = OtpConfig::default()
         .with_min_interval(None)
         .with_max_attempts(2);
@@ -233,31 +241,39 @@ fn test_otp_max_attempts() {
 
     let otp = manager
         .generate("user@example.com", OtpPurpose::Login)
+        .await
         .unwrap();
 
     // 错误尝试 2 次
-    let _ = manager.verify("user@example.com", "000000", OtpPurpose::Login);
-    let _ = manager.verify("user@example.com", "000001", OtpPurpose::Login);
+    let _ = manager
+        .verify("user@example.com", "000000", OtpPurpose::Login)
+        .await;
+    let _ = manager
+        .verify("user@example.com", "000001", OtpPurpose::Login)
+        .await;
 
     // 超过最大尝试次数，正确的验证码也无效
     assert!(
         manager
             .verify("user@example.com", &otp.code, OtpPurpose::Login)
+            .await
             .is_err()
     );
 }
 
 /// 测试不同用途的 OTP 相互独立
-#[test]
-fn test_otp_purpose_isolation() {
+#[tokio::test]
+async fn test_otp_purpose_isolation() {
     let config = OtpConfig::default().with_min_interval(None);
     let manager = OtpManager::new(config);
 
     let login_otp = manager
         .generate("user@example.com", OtpPurpose::Login)
+        .await
         .unwrap();
     let reset_otp = manager
         .generate("user@example.com", OtpPurpose::PasswordReset)
+        .await
         .unwrap();
 
     // 验证码不能跨用途使用
@@ -268,11 +284,13 @@ fn test_otp_purpose_isolation() {
                 &login_otp.code,
                 OtpPurpose::PasswordReset
             )
+            .await
             .is_err()
     );
     assert!(
         manager
             .verify("user@example.com", &reset_otp.code, OtpPurpose::Login)
+            .await
             .is_err()
     );
 
@@ -280,6 +298,7 @@ fn test_otp_purpose_isolation() {
     assert!(
         manager
             .verify("user@example.com", &login_otp.code, OtpPurpose::Login)
+            .await
             .is_ok()
     );
     assert!(
@@ -289,41 +308,46 @@ fn test_otp_purpose_isolation() {
                 &reset_otp.code,
                 OtpPurpose::PasswordReset
             )
+            .await
             .is_ok()
     );
 }
 
 /// 测试 OTP 撤销功能
-#[test]
-fn test_otp_revoke() {
+#[tokio::test]
+async fn test_otp_revoke() {
     let config = OtpConfig::default().with_min_interval(None);
     let manager = OtpManager::new(config);
 
     let otp = manager
         .generate("user@example.com", OtpPurpose::Login)
+        .await
         .unwrap();
 
     // 撤销
     manager
         .revoke("user@example.com", OtpPurpose::Login)
+        .await
         .unwrap();
 
     // 验证失败
     assert!(
         manager
             .verify("user@example.com", &otp.code, OtpPurpose::Login)
+            .await
             .is_err()
     );
 }
 
 /// 测试 OTP 高安全配置
-#[test]
-fn test_otp_high_security_config() {
+#[tokio::test]
+async fn test_otp_high_security_config() {
     let config = OtpConfig::high_security().with_min_interval(None);
     let manager = OtpManager::new(config);
 
     let otp = manager
         .generate("secure@example.com", OtpPurpose::TwoFactor)
+        .await
         .unwrap();
 
     // 8 位验证码
@@ -333,13 +357,14 @@ fn test_otp_high_security_config() {
     assert!(
         manager
             .verify("secure@example.com", &otp.code, OtpPurpose::TwoFactor)
+            .await
             .is_ok()
     );
 }
 
 /// 测试 OTP 自定义验证码长度
-#[test]
-fn test_otp_custom_code_length() {
+#[tokio::test]
+async fn test_otp_custom_code_length() {
     for length in [4, 6, 8, 10] {
         let config = OtpConfig::default()
             .with_code_length(length)
@@ -348,6 +373,7 @@ fn test_otp_custom_code_length() {
 
         let otp = manager
             .generate("user@example.com", OtpPurpose::Login)
+            .await
             .unwrap();
         assert_eq!(otp.code.len(), length);
 
@@ -355,14 +381,15 @@ fn test_otp_custom_code_length() {
         assert!(
             manager
                 .verify("user@example.com", &otp.code, OtpPurpose::Login)
+                .await
                 .is_ok()
         );
     }
 }
 
 /// 测试所有 OTP 用途
-#[test]
-fn test_all_otp_purposes() {
+#[tokio::test]
+async fn test_all_otp_purposes() {
     let config = OtpConfig::default().with_min_interval(None);
     let manager = OtpManager::new(config);
 
@@ -378,10 +405,11 @@ fn test_all_otp_purposes() {
     ];
 
     for purpose in purposes {
-        let otp = manager.generate("user@example.com", purpose).unwrap();
+        let otp = manager.generate("user@example.com", purpose).await.unwrap();
         assert!(
             manager
                 .verify("user@example.com", &otp.code, purpose)
+                .await
                 .is_ok(),
             "Failed for purpose: {:?}",
             purpose
@@ -417,8 +445,8 @@ async fn test_magic_link_login_scenario() {
 }
 
 /// 模拟完整的 OTP 登录流程
-#[test]
-fn test_otp_login_scenario() {
+#[tokio::test]
+async fn test_otp_login_scenario() {
     let config = OtpConfig::default()
         .with_code_length(6)
         .with_ttl(Duration::from_secs(300))
@@ -428,7 +456,10 @@ fn test_otp_login_scenario() {
 
     // 用户请求 OTP 登录
     let user_email = "bob@example.com";
-    let otp_data = manager.generate(user_email, OtpPurpose::Login).unwrap();
+    let otp_data = manager
+        .generate(user_email, OtpPurpose::Login)
+        .await
+        .unwrap();
 
     // 应用层发送验证码邮件/短信
     let code_to_send = &otp_data.code;
@@ -439,6 +470,7 @@ fn test_otp_login_scenario() {
     assert!(
         manager
             .verify(user_email, user_input, OtpPurpose::Login)
+            .await
             .is_ok()
     );
 
@@ -459,14 +491,19 @@ async fn test_password_reset_scenario() {
     // 用户请求密码重置
     let otp_data = manager
         .generate(user_email, OtpPurpose::PasswordReset)
+        .await
         .unwrap();
 
     // 用户第一次输入错误
-    let wrong_result = manager.verify(user_email, "000000", OtpPurpose::PasswordReset);
+    let wrong_result = manager
+        .verify(user_email, "000000", OtpPurpose::PasswordReset)
+        .await;
     assert!(wrong_result.is_err());
 
     // 用户第二次输入正确
-    let correct_result = manager.verify(user_email, &otp_data.code, OtpPurpose::PasswordReset);
+    let correct_result = manager
+        .verify(user_email, &otp_data.code, OtpPurpose::PasswordReset)
+        .await;
     assert!(correct_result.is_ok());
 
     // 应用层现在可以允许用户设置新密码
@@ -486,6 +523,7 @@ async fn test_email_verification_scenario() {
     // 用户注册时生成验证码
     let otp_data = manager
         .generate(new_email, OtpPurpose::EmailVerification)
+        .await
         .unwrap();
 
     // 验证码有效期检查
@@ -495,6 +533,7 @@ async fn test_email_verification_scenario() {
     assert!(
         manager
             .verify(new_email, &otp_data.code, OtpPurpose::EmailVerification)
+            .await
             .is_ok()
     );
 }
@@ -510,13 +549,14 @@ async fn test_magic_link_and_otp_coexistence() {
 
     // 同时生成 Magic Link 和 OTP
     let magic_link = ml_manager.generate(user).await.unwrap();
-    let otp = otp_manager.generate(user, OtpPurpose::Login).unwrap();
+    let otp = otp_manager.generate(user, OtpPurpose::Login).await.unwrap();
 
     // 两者都可以独立验证
     assert!(ml_manager.verify(&magic_link.token).await.is_ok());
     assert!(
         otp_manager
             .verify(user, &otp.code, OtpPurpose::Login)
+            .await
             .is_ok()
     );
 }

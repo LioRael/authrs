@@ -97,7 +97,7 @@ use crate::random::generate_random_base64_url;
 /// }
 ///
 /// let manager = SessionManager::new(SessionConfig::default());
-/// let mut session = manager.create("user123").unwrap();
+/// let mut session = manager.create("user123").await.unwrap();
 ///
 /// // 存储简单值
 /// session.set_metadata("theme", "dark");
@@ -205,7 +205,7 @@ impl Session {
     /// use authrs::token::session::{SessionManager, SessionConfig};
     ///
     /// let manager = SessionManager::new(SessionConfig::default());
-    /// let mut session = manager.create("user123").unwrap();
+    /// let mut session = manager.create("user123").await.unwrap();
     ///
     /// // 存储字符串
     /// session.set_metadata("role", "admin");
@@ -622,16 +622,16 @@ impl SessionStore for InMemorySessionStore {
 /// let manager = SessionManager::new(SessionConfig::default());
 ///
 /// // 创建 Session
-/// let session = manager.create("user123").unwrap();
+/// let session = manager.create("user123").await.unwrap();
 ///
 /// // 带元数据创建 Session
 /// let options = CreateSessionOptions::new()
 ///     .with_user_agent("Mozilla/5.0 ...")
 ///     .with_ip_address("192.168.1.1");
-/// let session = manager.create_with_options("user123", options).unwrap();
+/// let session = manager.create_with_options("user123", options).await.unwrap();
 ///
 /// // 验证 Session
-/// if manager.validate(&session.id, None, None).is_ok() {
+/// if manager.validate(&session.id, None, None).await.is_ok() {
 ///     println!("Session 有效");
 /// }
 ///

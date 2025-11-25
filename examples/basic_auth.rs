@@ -227,7 +227,7 @@ async fn main() {
 
     // 6. 登出
     println!("🚪 登出...");
-    auth.logout(&session_id);
+    auth.logout(&session_id).await;
 
     // 7. 登出后验证 Session
     println!("\n🔍 登出后验证 Session...");
