@@ -135,6 +135,44 @@ pub enum EventType {
     ApiKeyRevoked,
     /// API Key 使用
     ApiKeyUsed,
+    /// OAuth 客户端创建
+    OauthClientCreated,
+    /// OAuth 客户端删除
+    OauthClientDeleted,
+    /// OAuth 客户端密钥轮换
+    OauthClientSecretRotated,
+    /// OAuth Token 签发
+    OauthTokenIssued,
+    /// OAuth Token 吊销
+    OauthTokenRevoked,
+    /// OAuth Token 内省失败
+    OauthTokenIntrospectionFailed,
+    /// WebAuthn 注册成功
+    WebauthnRegistration,
+    /// WebAuthn 注册失败
+    WebauthnRegistrationFailed,
+    /// WebAuthn 断言成功
+    WebauthnAssertion,
+    /// WebAuthn 断言失败
+    WebauthnAssertionFailed,
+    /// 魔法链接创建
+    MagicLinkIssued,
+    /// 魔法链接使用
+    MagicLinkUsed,
+    /// 魔法链接过期
+    MagicLinkExpired,
+    /// OTP 发送
+    OtpSent,
+    /// OTP 验证成功
+    OtpVerified,
+    /// OTP 验证失败
+    OtpFailed,
+    /// Refresh Token 签发
+    RefreshTokenIssued,
+    /// Refresh Token 轮换
+    RefreshTokenRotated,
+    /// Refresh Token 重用检测
+    RefreshTokenReuseDetected,
     /// Session 创建
     SessionCreated,
     /// Session 过期
@@ -173,6 +211,29 @@ impl std::fmt::Display for EventType {
             EventType::ApiKeyCreated => write!(f, "api_key_created"),
             EventType::ApiKeyRevoked => write!(f, "api_key_revoked"),
             EventType::ApiKeyUsed => write!(f, "api_key_used"),
+            EventType::OauthClientCreated => write!(f, "oauth_client_created"),
+            EventType::OauthClientDeleted => write!(f, "oauth_client_deleted"),
+            EventType::OauthClientSecretRotated => write!(f, "oauth_client_secret_rotated"),
+            EventType::OauthTokenIssued => write!(f, "oauth_token_issued"),
+            EventType::OauthTokenRevoked => write!(f, "oauth_token_revoked"),
+            EventType::OauthTokenIntrospectionFailed => {
+                write!(f, "oauth_token_introspection_failed")
+            }
+            EventType::WebauthnRegistration => write!(f, "webauthn_registration"),
+            EventType::WebauthnRegistrationFailed => {
+                write!(f, "webauthn_registration_failed")
+            }
+            EventType::WebauthnAssertion => write!(f, "webauthn_assertion"),
+            EventType::WebauthnAssertionFailed => write!(f, "webauthn_assertion_failed"),
+            EventType::MagicLinkIssued => write!(f, "magic_link_issued"),
+            EventType::MagicLinkUsed => write!(f, "magic_link_used"),
+            EventType::MagicLinkExpired => write!(f, "magic_link_expired"),
+            EventType::OtpSent => write!(f, "otp_sent"),
+            EventType::OtpVerified => write!(f, "otp_verified"),
+            EventType::OtpFailed => write!(f, "otp_failed"),
+            EventType::RefreshTokenIssued => write!(f, "refresh_token_issued"),
+            EventType::RefreshTokenRotated => write!(f, "refresh_token_rotated"),
+            EventType::RefreshTokenReuseDetected => write!(f, "refresh_token_reuse_detected"),
             EventType::SessionCreated => write!(f, "session_created"),
             EventType::SessionExpired => write!(f, "session_expired"),
             EventType::SessionRevoked => write!(f, "session_revoked"),
@@ -335,6 +396,170 @@ impl SecurityEvent {
             .with_message(reason)
     }
 
+    /// 创建 OAuth 客户端创建事件
+    pub fn oauth_client_created(client_id: impl Into<String>) -> Self {
+        Self::new(EventType::OauthClientCreated, EventSeverity::Info)
+            .with_detail("client_id", client_id.into())
+            .with_message("OAuth client created")
+    }
+
+    /// 创建 OAuth 客户端删除事件
+    pub fn oauth_client_deleted(client_id: impl Into<String>) -> Self {
+        Self::new(EventType::OauthClientDeleted, EventSeverity::Warning)
+            .with_detail("client_id", client_id.into())
+            .with_message("OAuth client deleted")
+    }
+
+    /// 创建 OAuth 客户端密钥轮换事件
+    pub fn oauth_client_secret_rotated(client_id: impl Into<String>) -> Self {
+        Self::new(EventType::OauthClientSecretRotated, EventSeverity::Info)
+            .with_detail("client_id", client_id.into())
+            .with_message("OAuth client secret rotated")
+    }
+
+    /// 创建 OAuth Token 签发事件
+    pub fn oauth_token_issued(
+        client_id: impl Into<String>,
+        user_id: Option<impl Into<String>>,
+    ) -> Self {
+        let mut event = Self::new(EventType::OauthTokenIssued, EventSeverity::Info)
+            .with_detail("client_id", client_id.into())
+            .with_message("OAuth token issued");
+        if let Some(user_id) = user_id {
+            event = event.with_user_id(user_id);
+        }
+        event
+    }
+
+    /// 创建 OAuth Token 吊销事件
+    pub fn oauth_token_revoked(client_id: impl Into<String>, reason: impl Into<String>) -> Self {
+        Self::new(EventType::OauthTokenRevoked, EventSeverity::Warning)
+            .with_detail("client_id", client_id.into())
+            .with_message(format!("OAuth token revoked: {}", reason.into()))
+    }
+
+    /// 创建 OAuth Token 内省失败事件
+    pub fn oauth_token_introspection_failed(
+        client_id: impl Into<String>,
+        reason: impl Into<String>,
+    ) -> Self {
+        Self::new(EventType::OauthTokenIntrospectionFailed, EventSeverity::Warning)
+            .with_detail("client_id", client_id.into())
+            .with_message(format!("OAuth token introspection failed: {}", reason.into()))
+    }
+
+    /// 创建 WebAuthn 注册成功事件
+    pub fn webauthn_registration(user_id: impl Into<String>, rp_id: impl Into<String>) -> Self {
+        Self::new(EventType::WebauthnRegistration, EventSeverity::Info)
+            .with_user_id(user_id)
+            .with_detail("rp_id", rp_id.into())
+            .with_message("WebAuthn registration successful")
+    }
+
+    /// 创建 WebAuthn 注册失败事件
+    pub fn webauthn_registration_failed(
+        user_id: impl Into<String>,
+        rp_id: impl Into<String>,
+        reason: impl Into<String>,
+    ) -> Self {
+        Self::new(EventType::WebauthnRegistrationFailed, EventSeverity::Warning)
+            .with_user_id(user_id)
+            .with_detail("rp_id", rp_id.into())
+            .with_message(format!("WebAuthn registration failed: {}", reason.into()))
+    }
+
+    /// 创建 WebAuthn 断言成功事件
+    pub fn webauthn_assertion(user_id: impl Into<String>, rp_id: impl Into<String>) -> Self {
+        Self::new(EventType::WebauthnAssertion, EventSeverity::Info)
+            .with_user_id(user_id)
+            .with_detail("rp_id", rp_id.into())
+            .with_message("WebAuthn assertion successful")
+    }
+
+    /// 创建 WebAuthn 断言失败事件
+    pub fn webauthn_assertion_failed(
+        user_id: impl Into<String>,
+        rp_id: impl Into<String>,
+        reason: impl Into<String>,
+    ) -> Self {
+        Self::new(EventType::WebauthnAssertionFailed, EventSeverity::Warning)
+            .with_user_id(user_id)
+            .with_detail("rp_id", rp_id.into())
+            .with_message(format!("WebAuthn assertion failed: {}", reason.into()))
+    }
+
+    /// 创建魔法链接发放事件
+    pub fn magic_link_issued(recipient: impl Into<String>) -> Self {
+        Self::new(EventType::MagicLinkIssued, EventSeverity::Info)
+            .with_detail("recipient", recipient.into())
+            .with_message("Magic link issued")
+    }
+
+    /// 创建魔法链接使用事件
+    pub fn magic_link_used(recipient: impl Into<String>) -> Self {
+        Self::new(EventType::MagicLinkUsed, EventSeverity::Info)
+            .with_detail("recipient", recipient.into())
+            .with_message("Magic link used")
+    }
+
+    /// 创建魔法链接过期事件
+    pub fn magic_link_expired(recipient: impl Into<String>) -> Self {
+        Self::new(EventType::MagicLinkExpired, EventSeverity::Warning)
+            .with_detail("recipient", recipient.into())
+            .with_message("Magic link expired")
+    }
+
+    /// 创建 OTP 发送事件
+    pub fn otp_sent(recipient: impl Into<String>) -> Self {
+        Self::new(EventType::OtpSent, EventSeverity::Info)
+            .with_detail("recipient", recipient.into())
+            .with_message("OTP sent")
+    }
+
+    /// 创建 OTP 验证成功事件
+    pub fn otp_verified(recipient: impl Into<String>) -> Self {
+        Self::new(EventType::OtpVerified, EventSeverity::Info)
+            .with_detail("recipient", recipient.into())
+            .with_message("OTP verified")
+    }
+
+    /// 创建 OTP 验证失败事件
+    pub fn otp_failed(recipient: impl Into<String>, reason: impl Into<String>) -> Self {
+        Self::new(EventType::OtpFailed, EventSeverity::Warning)
+            .with_detail("recipient", recipient.into())
+            .with_message(format!("OTP verification failed: {}", reason.into()))
+    }
+
+    /// 创建 Refresh Token 签发事件
+    pub fn refresh_token_issued(user_id: impl Into<String>, family_id: impl Into<String>) -> Self {
+        Self::new(EventType::RefreshTokenIssued, EventSeverity::Info)
+            .with_user_id(user_id)
+            .with_detail("family_id", family_id.into())
+            .with_message("Refresh token issued")
+    }
+
+    /// 创建 Refresh Token 轮换事件
+    pub fn refresh_token_rotated(
+        user_id: impl Into<String>,
+        family_id: impl Into<String>,
+    ) -> Self {
+        Self::new(EventType::RefreshTokenRotated, EventSeverity::Info)
+            .with_user_id(user_id)
+            .with_detail("family_id", family_id.into())
+            .with_message("Refresh token rotated")
+    }
+
+    /// 创建 Refresh Token 重用检测事件
+    pub fn refresh_token_reuse_detected(
+        user_id: impl Into<String>,
+        family_id: impl Into<String>,
+    ) -> Self {
+        Self::new(EventType::RefreshTokenReuseDetected, EventSeverity::Critical)
+            .with_user_id(user_id)
+            .with_detail("family_id", family_id.into())
+            .with_message("Refresh token reuse detected")
+    }
+
     /// 创建 API Key 创建事件
     pub fn api_key_created(user_id: impl Into<String>, key_id: impl Into<String>) -> Self {
         Self::new(EventType::ApiKeyCreated, EventSeverity::Info)
@@ -417,6 +642,16 @@ impl SecurityEvent {
                 | EventType::Logout
                 | EventType::MfaVerified
                 | EventType::MfaFailed
+                | EventType::MagicLinkIssued
+                | EventType::MagicLinkUsed
+                | EventType::MagicLinkExpired
+                | EventType::OtpSent
+                | EventType::OtpVerified
+                | EventType::OtpFailed
+                | EventType::WebauthnRegistration
+                | EventType::WebauthnRegistrationFailed
+                | EventType::WebauthnAssertion
+                | EventType::WebauthnAssertionFailed
         )
     }
 }
@@ -861,5 +1096,26 @@ mod tests {
 
         // 两个 logger 应该共享状态
         assert_eq!(logger2.event_count(), 1);
+    }
+
+    #[test]
+    fn test_refresh_token_reuse_detected_event() {
+        let event =
+            SecurityEvent::refresh_token_reuse_detected("user1", "fam123");
+
+        assert_eq!(event.event_type, EventType::RefreshTokenReuseDetected);
+        assert_eq!(event.severity, EventSeverity::Critical);
+        assert_eq!(event.user_id.as_deref(), Some("user1"));
+        assert_eq!(event.details.get("family_id"), Some(&"fam123".to_string()));
+    }
+
+    #[test]
+    fn test_oauth_token_issued_event() {
+        let event = SecurityEvent::oauth_token_issued("client-1", Some("user-9"));
+
+        assert_eq!(event.event_type, EventType::OauthTokenIssued);
+        assert_eq!(event.severity, EventSeverity::Info);
+        assert_eq!(event.user_id.as_deref(), Some("user-9"));
+        assert_eq!(event.details.get("client_id"), Some(&"client-1".to_string()));
     }
 }
