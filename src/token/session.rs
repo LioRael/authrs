@@ -13,6 +13,7 @@
 //! ## 示例
 //!
 //! ```rust
+//! # tokio::runtime::Runtime::new().unwrap().block_on(async {
 //! use authrs::token::session::{SessionManager, SessionConfig};
 //! use std::time::Duration;
 //!
@@ -20,16 +21,17 @@
 //! let manager = SessionManager::new(SessionConfig::default());
 //!
 //! // 创建 Session
-//! let session = manager.create("user123").unwrap();
+//! let session = manager.create("user123").await.unwrap();
 //! println!("Session ID: {}", session.id);
 //!
 //! // 验证 Session
-//! if let Some(session) = manager.get(&session.id) {
+//! if let Some(session) = manager.get(&session.id).await {
 //!     println!("User: {}", session.user_id);
 //! }
 //!
 //! // 销毁 Session
-//! manager.destroy(&session.id);
+//! manager.destroy(&session.id).await;
+//! # });
 //! ```
 //!
 //! ## 自定义存储后端
@@ -96,6 +98,7 @@ use crate::random::generate_random_base64_url;
 ///     role: String,
 /// }
 ///
+/// # tokio::runtime::Runtime::new().unwrap().block_on(async {
 /// let manager = SessionManager::new(SessionConfig::default());
 /// let mut session = manager.create("user123").await.unwrap();
 ///
@@ -112,6 +115,7 @@ use crate::random::generate_random_base64_url;
 /// // 类型安全地读取
 /// let theme: Option<String> = session.get_metadata("theme");
 /// let profile: Option<UserProfile> = session.get_metadata("profile");
+/// # });
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Session {
@@ -204,6 +208,7 @@ impl Session {
     /// ```rust
     /// use authrs::token::session::{SessionManager, SessionConfig};
     ///
+    /// # tokio::runtime::Runtime::new().unwrap().block_on(async {
     /// let manager = SessionManager::new(SessionConfig::default());
     /// let mut session = manager.create("user123").await.unwrap();
     ///
@@ -215,6 +220,7 @@ impl Session {
     ///
     /// // 存储数组
     /// session.set_metadata("permissions", vec!["read", "write"]);
+    /// # });
     /// ```
     pub fn set_metadata<T: Serialize>(&mut self, key: impl Into<String>, value: T) {
         if let Ok(json_value) = serde_json::to_value(value)
@@ -233,8 +239,9 @@ impl Session {
     /// ```rust
     /// use authrs::token::session::{SessionManager, SessionConfig};
     ///
+    /// # tokio::runtime::Runtime::new().unwrap().block_on(async {
     /// let manager = SessionManager::new(SessionConfig::default());
-    /// let mut session = manager.create("user123").unwrap();
+    /// let mut session = manager.create("user123").await.unwrap();
     ///
     /// session.set_metadata("role", "admin");
     /// session.set_metadata("login_count", 42);
@@ -245,6 +252,7 @@ impl Session {
     ///
     /// assert_eq!(role, Some("admin".to_string()));
     /// assert_eq!(count, Some(42));
+    /// # });
     /// ```
     pub fn get_metadata<T: DeserializeOwned>(&self, key: &str) -> Option<T> {
         self.metadata
@@ -617,6 +625,7 @@ impl SessionStore for InMemorySessionStore {
 /// ## 示例
 ///
 /// ```rust
+/// # tokio::runtime::Runtime::new().unwrap().block_on(async {
 /// use authrs::token::session::{SessionManager, SessionConfig, CreateSessionOptions};
 ///
 /// let manager = SessionManager::new(SessionConfig::default());
@@ -636,7 +645,8 @@ impl SessionStore for InMemorySessionStore {
 /// }
 ///
 /// // 销毁 Session
-/// manager.destroy(&session.id);
+/// manager.destroy(&session.id).await;
+/// # });
 /// ```
 pub struct SessionManager {
     store: Arc<dyn SessionStore>,

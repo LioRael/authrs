@@ -92,18 +92,20 @@
 //! ## Session 管理示例
 //!
 //! ```rust
+//! # tokio::runtime::Runtime::new().unwrap().block_on(async {
 //! use authrs::token::session::{SessionManager, SessionConfig};
 //!
 //! // 创建 Session 管理器
 //! let manager = SessionManager::new(SessionConfig::default());
 //!
 //! // 创建 Session
-//! let session = manager.create("user123").unwrap();
+//! let session = manager.create("user123").await.unwrap();
 //!
 //! // 获取 Session
-//! if let Some(s) = manager.get(&session.id) {
+//! if let Some(s) = manager.get(&session.id).await {
 //!     println!("User: {}", s.user_id);
 //! }
+//! # });
 //! ```
 //!
 //! ## OAuth 2.0 示例
@@ -215,7 +217,8 @@
 //! use authrs::rbac::{Permission, Role, RoleBuilder, RoleManager, PolicyEngine, Policy, Subject, Resource, Action};
 //!
 //! // 创建角色管理器
-//! let mut manager = RoleManager::new();
+//! # tokio::runtime::Runtime::new().unwrap().block_on(async {
+//! let manager = RoleManager::new();
 //!
 //! // 创建角色
 //! let viewer = RoleBuilder::new("viewer")
@@ -227,12 +230,20 @@
 //!     .permission(Permission::new("posts", "write"))
 //!     .build();
 //!
-//! manager.add_role(viewer);
-//! manager.add_role(editor);
+//! manager.add_role(viewer).await;
+//! manager.add_role(editor).await;
 //!
 //! // 检查权限
-//! assert!(manager.role_has_permission("editor", &Permission::new("posts", "read")));
-//! assert!(manager.role_has_permission("editor", &Permission::new("posts", "write")));
+//! assert!(
+//!     manager
+//!         .role_has_permission("editor", &Permission::new("posts", "read"))
+//!         .await
+//! );
+//! assert!(
+//!     manager
+//!         .role_has_permission("editor", &Permission::new("posts", "write"))
+//!         .await
+//! );
 //!
 //! // 使用策略引擎
 //! let mut engine = PolicyEngine::new();
@@ -246,6 +257,7 @@
 //!
 //! let user = Subject::new("user1").with_role("editor");
 //! assert!(engine.check_permission(&user, "posts", "read"));
+//! # });
 //! ```
 
 #[cfg(feature = "api-key")]

@@ -13,6 +13,7 @@
 //! ## 示例
 //!
 //! ```rust
+//! # tokio::runtime::Runtime::new().unwrap().block_on(async {
 //! use authrs::token::refresh::{RefreshTokenManager, RefreshConfig};
 //!
 //! // 创建 Refresh Token 管理器
@@ -20,14 +21,15 @@
 //! let manager = RefreshTokenManager::new(config);
 //!
 //! // 生成 Refresh Token
-//! let token = manager.generate("user123").unwrap();
+//! let token = manager.generate("user123").await.unwrap();
 //! println!("Token: {}", token.token);
 //!
 //! // 使用 Refresh Token（会自动轮换）
-//! let result = manager.use_token(&token.token).unwrap();
+//! let result = manager.use_token(&token.token).await.unwrap();
 //! if let Some(new_token) = result.new_token {
 //!     println!("New Token: {}", new_token.token);
 //! }
+//! # });
 //! ```
 //!
 //! ## 自定义存储后端
@@ -87,7 +89,8 @@ use crate::random::{generate_random_base64_url, generate_random_hex};
 /// use serde::{Serialize, Deserialize};
 ///
 /// let manager = RefreshTokenManager::new(RefreshConfig::default());
-/// let mut token = manager.generate("user123").unwrap();
+/// # tokio::runtime::Runtime::new().unwrap().block_on(async {
+/// let mut token = manager.generate("user123").await.unwrap();
 ///
 /// // 存储设备信息
 /// token.set_metadata("device_type", "mobile");
@@ -95,6 +98,7 @@ use crate::random::{generate_random_base64_url, generate_random_hex};
 ///
 /// // 类型安全地读取
 /// let device: Option<String> = token.get_metadata("device_type");
+/// # });
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RefreshToken {
@@ -195,13 +199,15 @@ impl RefreshToken {
     /// # 示例
     ///
     /// ```rust
+    /// # tokio::runtime::Runtime::new().unwrap().block_on(async {
     /// use authrs::token::refresh::{RefreshTokenManager, RefreshConfig};
     ///
     /// let manager = RefreshTokenManager::new(RefreshConfig::default());
-    /// let mut token = manager.generate("user123").unwrap();
+    /// let mut token = manager.generate("user123").await.unwrap();
     ///
     /// token.set_metadata("device", "iPhone");
     /// token.set_metadata("login_count", 5);
+    /// # });
     /// ```
     pub fn set_metadata<T: Serialize>(&mut self, key: impl Into<String>, value: T) {
         if let Ok(json_value) = serde_json::to_value(value)
@@ -218,14 +224,16 @@ impl RefreshToken {
     /// # 示例
     ///
     /// ```rust
+    /// # tokio::runtime::Runtime::new().unwrap().block_on(async {
     /// use authrs::token::refresh::{RefreshTokenManager, RefreshConfig};
     ///
     /// let manager = RefreshTokenManager::new(RefreshConfig::default());
-    /// let mut token = manager.generate("user123").unwrap();
+    /// let mut token = manager.generate("user123").await.unwrap();
     ///
     /// token.set_metadata("device", "iPhone");
     /// let device: Option<String> = token.get_metadata("device");
     /// assert_eq!(device, Some("iPhone".to_string()));
+    /// # });
     /// ```
     pub fn get_metadata<T: DeserializeOwned>(&self, key: &str) -> Option<T> {
         self.metadata
@@ -695,27 +703,32 @@ pub struct TokenUseResult {
 /// ## 示例
 ///
 /// ```rust
+/// # tokio::runtime::Runtime::new().unwrap().block_on(async {
 /// use authrs::token::refresh::{RefreshTokenManager, RefreshConfig, GenerateOptions};
 ///
 /// let manager = RefreshTokenManager::new(RefreshConfig::default());
 ///
 /// // 生成 Token
-/// let token = manager.generate("user123").unwrap();
+/// let token = manager.generate("user123").await.unwrap();
 ///
 /// // 带元数据生成 Token
 /// let options = GenerateOptions::new()
 ///     .with_device_info("iPhone 15")
 ///     .with_ip_address("192.168.1.1");
-/// let token = manager.generate_with_options("user123", options).unwrap();
+/// let token = manager
+///     .generate_with_options("user123", options)
+///     .await
+///     .unwrap();
 ///
 /// // 使用 Token（会自动轮换）
-/// let result = manager.use_token(&token.token).unwrap();
+/// let result = manager.use_token(&token.token).await.unwrap();
 /// if let Some(new_token) = result.new_token {
 ///     println!("使用新 Token: {}", new_token.token);
 /// }
 ///
 /// // 撤销用户的所有 Token
-/// manager.revoke_all_for_user("user123").unwrap();
+/// manager.revoke_all_for_user("user123").await.unwrap();
+/// # });
 /// ```
 pub struct RefreshTokenManager {
     store: Arc<dyn RefreshTokenStore>,

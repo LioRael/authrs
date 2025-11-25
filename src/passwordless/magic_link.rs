@@ -13,21 +13,23 @@
 //! ## 示例
 //!
 //! ```rust
+//! # tokio::runtime::Runtime::new().unwrap().block_on(async {
 //! use authrs::passwordless::{MagicLinkManager, MagicLinkConfig};
 //!
 //! // 使用默认配置
 //! let manager = MagicLinkManager::new(MagicLinkConfig::default());
 //!
 //! // 生成 magic link token
-//! let data = manager.generate("user@example.com").unwrap();
+//! let data = manager.generate("user@example.com").await.unwrap();
 //! println!("Token: {}", data.token);
 //! println!("过期时间: {:?}", data.expires_at);
 //!
 //! // 验证 token
-//! match manager.verify(&data.token) {
+//! match manager.verify(&data.token).await {
 //!     Ok(email) => println!("用户 {} 验证成功", email),
 //!     Err(e) => println!("验证失败: {}", e),
 //! }
+//! # });
 //! ```
 //!
 //! ## 自定义配置
@@ -321,16 +323,18 @@ impl MagicLinkStore for InMemoryMagicLinkStore {
 /// ## 示例
 ///
 /// ```rust
+/// # tokio::runtime::Runtime::new().unwrap().block_on(async {
 /// use authrs::passwordless::{MagicLinkManager, MagicLinkConfig};
 ///
 /// let manager = MagicLinkManager::new(MagicLinkConfig::default());
 ///
 /// // 生成 token
-/// let data = manager.generate("user@example.com").unwrap();
+/// let data = manager.generate("user@example.com").await.unwrap();
 ///
 /// // 验证 token
-/// let email = manager.verify(&data.token).unwrap();
+/// let email = manager.verify(&data.token).await.unwrap();
 /// assert_eq!(email, "user@example.com");
+/// # });
 /// ```
 pub struct MagicLinkManager<S: MagicLinkStore = InMemoryMagicLinkStore> {
     store: S,
@@ -371,13 +375,15 @@ impl<S: MagicLinkStore> MagicLinkManager<S> {
     /// # Example
     ///
     /// ```rust
+    /// # tokio::runtime::Runtime::new().unwrap().block_on(async {
     /// use authrs::passwordless::{MagicLinkManager, MagicLinkConfig};
     ///
     /// let manager = MagicLinkManager::new(MagicLinkConfig::default());
-    /// let data = manager.generate("user@example.com").unwrap();
+    /// let data = manager.generate("user@example.com").await.unwrap();
     ///
     /// // 构建完整 URL
     /// let url = format!("https://example.com/login?token={}", data.token);
+    /// # });
     /// ```
     pub async fn generate(&self, identifier: impl Into<String>) -> Result<MagicLinkData> {
         let identifier = identifier.into();
@@ -427,17 +433,19 @@ impl<S: MagicLinkStore> MagicLinkManager<S> {
     /// # Example
     ///
     /// ```rust
+    /// # tokio::runtime::Runtime::new().unwrap().block_on(async {
     /// use authrs::passwordless::{MagicLinkManager, MagicLinkConfig};
     ///
     /// let manager = MagicLinkManager::new(MagicLinkConfig::default());
-    /// let data = manager.generate("user@example.com").unwrap();
+    /// let data = manager.generate("user@example.com").await.unwrap();
     ///
     /// // 验证 token
-    /// let email = manager.verify(&data.token).unwrap();
+    /// let email = manager.verify(&data.token).await.unwrap();
     /// assert_eq!(email, "user@example.com");
     ///
     /// // token 已被消费，再次验证会失败
-    /// assert!(manager.verify(&data.token).is_err());
+    /// assert!(manager.verify(&data.token).await.is_err());
+    /// # });
     /// ```
     pub async fn verify(&self, token: &str) -> Result<String> {
         // 获取 token 记录

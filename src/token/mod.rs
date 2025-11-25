@@ -37,6 +37,7 @@
 //! ## Session Token 示例
 //!
 //! ```rust
+//! # tokio::runtime::Runtime::new().unwrap().block_on(async {
 //! use authrs::token::session::{SessionManager, SessionConfig};
 //!
 //! // 创建 session 管理器（使用内存存储）
@@ -44,17 +45,19 @@
 //! let manager = SessionManager::new(config);
 //!
 //! // 创建 session
-//! let session = manager.create("user123").unwrap();
+//! let session = manager.create("user123").await.unwrap();
 //!
 //! // 验证 session
-//! if let Some(s) = manager.get(&session.id) {
+//! if let Some(s) = manager.get(&session.id).await {
 //!     assert_eq!(s.user_id, "user123");
 //! }
+//! # });
 //! ```
 //!
 //! ## Refresh Token 示例
 //!
 //! ```rust
+//! # tokio::runtime::Runtime::new().unwrap().block_on(async {
 //! use authrs::token::refresh::{RefreshTokenManager, RefreshConfig};
 //!
 //! // 创建 Refresh Token 管理器
@@ -62,13 +65,14 @@
 //! let manager = RefreshTokenManager::new(config);
 //!
 //! // 生成 Refresh Token
-//! let token = manager.generate("user123").unwrap();
+//! let token = manager.generate("user123").await.unwrap();
 //!
 //! // 使用 Refresh Token（会自动轮换）
-//! let result = manager.use_token(&token.token).unwrap();
+//! let result = manager.use_token(&token.token).await.unwrap();
 //! if let Some(new_token) = result.new_token {
 //!     println!("New token generated");
 //! }
+//! # });
 //! ```
 
 #[cfg(feature = "jwt")]

@@ -12,6 +12,7 @@
 //! ## 示例
 //!
 //! ```rust
+//! # tokio::runtime::Runtime::new().unwrap().block_on(async {
 //! use authrs::security::rate_limit::{RateLimiter, RateLimitConfig};
 //! use std::time::Duration;
 //!
@@ -23,8 +24,9 @@
 //!
 //! // 检查请求
 //! let key = "user:123:login";
-//! let result = limiter.check(key);
+//! let result = limiter.check(key).await;
 //! assert!(result.is_ok());
+//! # });
 //! ```
 
 use async_trait::async_trait;
@@ -633,6 +635,7 @@ impl RateLimitStore for InMemoryFixedWindowStore {
 /// ## 示例
 ///
 /// ```rust
+/// # tokio::runtime::Runtime::new().unwrap().block_on(async {
 /// use authrs::security::rate_limit::{RateLimiter, RateLimitConfig};
 /// use std::time::Duration;
 ///
@@ -641,10 +644,11 @@ impl RateLimitStore for InMemoryFixedWindowStore {
 ///
 /// // 检查请求
 /// let key = "login:user@example.com";
-/// match limiter.check(key) {
+/// match limiter.check(key).await {
 ///     Ok(info) => println!("允许，剩余 {} 次", info.remaining),
 ///     Err(e) => println!("被限制: {:?}", e),
 /// }
+/// # });
 /// ```
 pub struct RateLimiter {
     config: RateLimitConfig,

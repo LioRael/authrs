@@ -12,6 +12,7 @@
 //! ## 速率限制示例
 //!
 //! ```rust
+//! # tokio::runtime::Runtime::new().unwrap().block_on(async {
 //! use authrs::security::rate_limit::{RateLimiter, RateLimitConfig};
 //! use std::time::Duration;
 //!
@@ -23,10 +24,11 @@
 //!
 //! // 检查请求是否被允许
 //! let key = "user:123:login";
-//! match limiter.check(key) {
+//! match limiter.check(key).await {
 //!     Ok(info) => println!("允许请求，剩余: {}", info.remaining),
 //!     Err(_) => println!("请求被限制"),
 //! }
+//! # });
 //! ```
 //!
 //! ## CSRF 防护示例

@@ -19,23 +19,31 @@
 //! ## 示例
 //!
 //! ```rust
+//! # tokio::runtime::Runtime::new().unwrap().block_on(async {
 //! use authrs::passwordless::{OtpManager, OtpConfig, OtpPurpose};
 //!
 //! // 创建管理器
 //! let manager = OtpManager::new(OtpConfig::default());
 //!
 //! // 生成 OTP
-//! let otp_data = manager.generate("user@example.com", OtpPurpose::Login).unwrap();
+//! let otp_data = manager
+//!     .generate("user@example.com", OtpPurpose::Login)
+//!     .await
+//!     .unwrap();
 //! println!("验证码: {}", otp_data.code);  // 例如: "847291"
 //!
 //! // 应用层发送验证码（邮件/短信）
 //! // send_email(user_email, otp_data.code);
 //!
 //! // 验证用户输入的验证码
-//! match manager.verify("user@example.com", &otp_data.code, OtpPurpose::Login) {
+//! match manager
+//!     .verify("user@example.com", &otp_data.code, OtpPurpose::Login)
+//!     .await
+//! {
 //!     Ok(()) => println!("验证成功"),
 //!     Err(e) => println!("验证失败: {}", e),
 //! }
+//! # });
 //! ```
 //!
 //! ## 自定义配置
@@ -444,16 +452,24 @@ impl OtpStore for InMemoryOtpStore {
 /// ## 示例
 ///
 /// ```rust
+/// # tokio::runtime::Runtime::new().unwrap().block_on(async {
 /// use authrs::passwordless::{OtpManager, OtpConfig, OtpPurpose};
 ///
 /// let manager = OtpManager::new(OtpConfig::default());
 ///
 /// // 生成 OTP
-/// let otp = manager.generate("user@example.com", OtpPurpose::Login).unwrap();
+/// let otp = manager
+///     .generate("user@example.com", OtpPurpose::Login)
+///     .await
+///     .unwrap();
 /// println!("验证码: {}", otp.code);
 ///
 /// // 验证 OTP
-/// manager.verify("user@example.com", &otp.code, OtpPurpose::Login).unwrap();
+/// manager
+///     .verify("user@example.com", &otp.code, OtpPurpose::Login)
+///     .await
+///     .unwrap();
+/// # });
 /// ```
 pub struct OtpManager<S: OtpStore = InMemoryOtpStore> {
     store: S,
@@ -509,11 +525,16 @@ impl<S: OtpStore> OtpManager<S> {
     /// ```rust
     /// use authrs::passwordless::{OtpManager, OtpConfig, OtpPurpose};
     ///
+    /// # tokio::runtime::Runtime::new().unwrap().block_on(async {
     /// let manager = OtpManager::new(OtpConfig::default());
-    /// let otp = manager.generate("user@example.com", OtpPurpose::Login).unwrap();
+    /// let otp = manager
+    ///     .generate("user@example.com", OtpPurpose::Login)
+    ///     .await
+    ///     .unwrap();
     ///
     /// // 发送验证码给用户
     /// println!("请输入验证码: {}", otp.code);
+    /// # });
     /// ```
     pub async fn generate(
         &self,
@@ -597,14 +618,29 @@ impl<S: OtpStore> OtpManager<S> {
     /// ```rust
     /// use authrs::passwordless::{OtpManager, OtpConfig, OtpPurpose};
     ///
+    /// # tokio::runtime::Runtime::new().unwrap().block_on(async {
     /// let manager = OtpManager::new(OtpConfig::default());
-    /// let otp = manager.generate("user@example.com", OtpPurpose::Login).unwrap();
+    /// let otp = manager
+    ///     .generate("user@example.com", OtpPurpose::Login)
+    ///     .await
+    ///     .unwrap();
     ///
     /// // 验证正确的验证码
-    /// assert!(manager.verify("user@example.com", &otp.code, OtpPurpose::Login).is_ok());
+    /// assert!(
+    ///     manager
+    ///         .verify("user@example.com", &otp.code, OtpPurpose::Login)
+    ///         .await
+    ///         .is_ok()
+    /// );
     ///
     /// // 验证码已被消费，再次验证会失败
-    /// assert!(manager.verify("user@example.com", &otp.code, OtpPurpose::Login).is_err());
+    /// assert!(
+    ///     manager
+    ///         .verify("user@example.com", &otp.code, OtpPurpose::Login)
+    ///         .await
+    ///         .is_err()
+    /// );
+    /// # });
     /// ```
     pub async fn verify(&self, identifier: &str, code: &str, purpose: OtpPurpose) -> Result<()> {
         // 获取存储的 OTP

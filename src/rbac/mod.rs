@@ -106,7 +106,8 @@
 //! ```rust
 //! use authrs::rbac::{Permission, Role, RoleBuilder, RoleManager};
 //!
-//! let mut manager = RoleManager::new();
+//! # tokio::runtime::Runtime::new().unwrap().block_on(async {
+//! let manager = RoleManager::new();
 //!
 //! // 创建基础角色
 //! let viewer = RoleBuilder::new("viewer")
@@ -119,13 +120,14 @@
 //!     .permission(Permission::new("posts", "write"))
 //!     .build();
 //!
-//! manager.add_role(viewer);
-//! manager.add_role(editor);
+//! manager.add_role(viewer).await;
+//! manager.add_role(editor).await;
 //!
 //! // editor 拥有继承的 read 权限和自己的 write 权限
-//! let effective = manager.get_effective_permissions("editor");
+//! let effective = manager.get_effective_permissions("editor").await;
 //! assert!(effective.contains(&Permission::new("posts", "read")));
 //! assert!(effective.contains(&Permission::new("posts", "write")));
+//! # });
 //! ```
 
 mod permission;
