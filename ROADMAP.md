@@ -15,6 +15,8 @@
 | **api_key/** | API Key 管理（哈希存储、权限范围、过期、轮换） | ✅ 完成 |
 | **webauthn/** | WebAuthn / Passkeys（注册、认证、凭证管理） | ✅ 完成 |
 | **rbac/** | 角色权限管理、策略引擎 | ✅ 完成 |
+| **passwordless/** | Magic Link、OTP (Email/SMS) 无密码认证 | ✅ 完成 |
+| **crypto/** | HKDF 密钥派生函数 (SHA256/SHA512) | ✅ 完成 |
 | **random.rs** | 安全随机数、常量时间比较 | ✅ 完成 |
 | **error.rs** | 统一错误类型 | ✅ 完成 |
 | **audit.rs** | 审计日志、安全事件记录 | ✅ 完成 |
@@ -137,20 +139,32 @@ src/rbac/
 
 ### 🟢 低优先级
 
-#### 6. Passwordless 认证模块
+#### 6. ~~Passwordless 认证模块~~ ✅ 已完成
 
-```
-src/passwordless/
-├── mod.rs
-├── magic_link.rs   # 魔法链接
-├── email_otp.rs    # 邮件一次性密码
-└── sms_otp.rs      # 短信一次性密码
+```rust
+// src/passwordless/ ✅
+
+// Magic Link
+pub struct MagicLinkManager { ... }  // ✅ Magic Link 管理器
+pub struct MagicLinkConfig { ... }   // ✅ 配置
+pub trait MagicLinkStore { ... }     // ✅ 存储接口
+
+// OTP (Email/SMS)
+pub struct OtpManager { ... }        // ✅ OTP 管理器
+pub struct OtpConfig { ... }         // ✅ 配置
+pub enum OtpPurpose { ... }          // ✅ 用途枚举
+pub trait OtpStore { ... }           // ✅ 存储接口
 ```
 
 **功能点：**
-- [ ] Magic Link 生成与验证
-- [ ] Email OTP
-- [ ] SMS OTP
+- [x] Magic Link 生成与验证
+- [x] Magic Link 撤销和批量撤销
+- [x] OTP (一次性密码) 生成与验证
+- [x] OTP 用途分离 (Login, Registration, PasswordReset 等)
+- [x] 最大尝试次数限制
+- [x] 最小生成间隔（防滥用）
+- [x] 常量时间比较（防时序攻击）
+- [x] 内存存储实现
 
 #### 7. ~~安全 Cookie 助手~~ ✅ 已完成
 
@@ -278,8 +292,9 @@ passwordless = []
 - 更完善的文档
 
 ### v0.4.0
-- Passwordless 认证
-- 安全 Cookie 助手
+- ~~Passwordless 认证~~ ✅ 已完成
+- ~~安全 Cookie 助手~~ ✅ 已完成
+- scrypt 密码哈希
 
 ### v1.0.0
 - 完整文档

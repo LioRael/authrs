@@ -249,6 +249,7 @@ pub mod mfa;
 #[cfg(feature = "oauth")]
 pub mod oauth;
 pub mod password;
+pub mod passwordless;
 pub mod random;
 #[cfg(feature = "rbac")]
 pub mod rbac;
@@ -416,6 +417,26 @@ pub use webauthn::{
 
 pub use crypto::kdf::{
     Hkdf, HkdfAlgorithm, derive_key_from_password, derive_subkeys, hkdf_sha256, hkdf_sha512,
+};
+
+// ============================================================================
+// Passwordless 认证相关导出
+// ============================================================================
+
+pub use passwordless::{
+    // Magic Link
+    InMemoryMagicLinkStore,
+    // OTP
+    InMemoryOtpStore,
+    MagicLinkConfig,
+    MagicLinkData,
+    MagicLinkManager,
+    MagicLinkStore,
+    OtpConfig,
+    OtpData,
+    OtpManager,
+    OtpPurpose,
+    OtpStore,
 };
 
 // ============================================================================
