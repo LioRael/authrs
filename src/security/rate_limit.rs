@@ -27,6 +27,7 @@
 //! assert!(result.is_ok());
 //! ```
 
+use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
@@ -280,27 +281,28 @@ impl FixedWindowRecord {
 }
 
 /// 速率限制器存储 trait
+#[async_trait]
 pub trait RateLimitStore: Send + Sync {
     /// 检查并记录请求
     ///
     /// 返回 `Ok(RateLimitInfo)` 如果请求被允许，
     /// 返回 `Err` 如果请求被限制
-    fn check_and_record(&self, key: &str, config: &RateLimitConfig) -> Result<RateLimitInfo>;
+    async fn check_and_record(&self, key: &str, config: &RateLimitConfig) -> Result<RateLimitInfo>;
 
     /// 重置某个 key 的限制
-    fn reset(&self, key: &str);
+    async fn reset(&self, key: &str);
 
     /// 获取当前状态（不记录请求）
-    fn get_status(&self, key: &str, config: &RateLimitConfig) -> RateLimitInfo;
+    async fn get_status(&self, key: &str, config: &RateLimitConfig) -> RateLimitInfo;
 
     /// 手动封禁某个 key
-    fn ban(&self, key: &str, duration: Duration);
+    async fn ban(&self, key: &str, duration: Duration);
 
     /// 解除封禁
-    fn unban(&self, key: &str);
+    async fn unban(&self, key: &str);
 
     /// 清理过期记录
-    fn cleanup(&self);
+    async fn cleanup(&self);
 }
 
 /// 内存速率限制存储（滑动窗口）
@@ -324,8 +326,9 @@ impl InMemorySlidingWindowStore {
     }
 }
 
+#[async_trait]
 impl RateLimitStore for InMemorySlidingWindowStore {
-    fn check_and_record(&self, key: &str, config: &RateLimitConfig) -> Result<RateLimitInfo> {
+    async fn check_and_record(&self, key: &str, config: &RateLimitConfig) -> Result<RateLimitInfo> {
         let mut records = self
             .records
             .write()
@@ -390,13 +393,13 @@ impl RateLimitStore for InMemorySlidingWindowStore {
         ))
     }
 
-    fn reset(&self, key: &str) {
+    async fn reset(&self, key: &str) {
         if let Ok(mut records) = self.records.write() {
             records.remove(key);
         }
     }
 
-    fn get_status(&self, key: &str, config: &RateLimitConfig) -> RateLimitInfo {
+    async fn get_status(&self, key: &str, config: &RateLimitConfig) -> RateLimitInfo {
         let records = match self.records.read() {
             Ok(r) => r,
             Err(_) => {
@@ -430,7 +433,7 @@ impl RateLimitStore for InMemorySlidingWindowStore {
         }
     }
 
-    fn ban(&self, key: &str, duration: Duration) {
+    async fn ban(&self, key: &str, duration: Duration) {
         if let Ok(mut records) = self.records.write() {
             let record = records
                 .entry(key.to_string())
@@ -439,7 +442,7 @@ impl RateLimitStore for InMemorySlidingWindowStore {
         }
     }
 
-    fn unban(&self, key: &str) {
+    async fn unban(&self, key: &str) {
         if let Ok(mut records) = self.records.write()
             && let Some(record) = records.get_mut(key)
         {
@@ -448,7 +451,7 @@ impl RateLimitStore for InMemorySlidingWindowStore {
         }
     }
 
-    fn cleanup(&self) {
+    async fn cleanup(&self) {
         if let Ok(mut records) = self.records.write() {
             let now = Instant::now();
             records.retain(|_, record| {
@@ -490,8 +493,9 @@ impl InMemoryFixedWindowStore {
     }
 }
 
+#[async_trait]
 impl RateLimitStore for InMemoryFixedWindowStore {
-    fn check_and_record(&self, key: &str, config: &RateLimitConfig) -> Result<RateLimitInfo> {
+    async fn check_and_record(&self, key: &str, config: &RateLimitConfig) -> Result<RateLimitInfo> {
         let mut records = self
             .records
             .write()
@@ -545,13 +549,13 @@ impl RateLimitStore for InMemoryFixedWindowStore {
         ))
     }
 
-    fn reset(&self, key: &str) {
+    async fn reset(&self, key: &str) {
         if let Ok(mut records) = self.records.write() {
             records.remove(key);
         }
     }
 
-    fn get_status(&self, key: &str, config: &RateLimitConfig) -> RateLimitInfo {
+    async fn get_status(&self, key: &str, config: &RateLimitConfig) -> RateLimitInfo {
         let records = match self.records.read() {
             Ok(r) => r,
             Err(_) => {
@@ -587,7 +591,7 @@ impl RateLimitStore for InMemoryFixedWindowStore {
         }
     }
 
-    fn ban(&self, key: &str, duration: Duration) {
+    async fn ban(&self, key: &str, duration: Duration) {
         if let Ok(mut records) = self.records.write() {
             let record = records
                 .entry(key.to_string())
@@ -596,7 +600,7 @@ impl RateLimitStore for InMemoryFixedWindowStore {
         }
     }
 
-    fn unban(&self, key: &str) {
+    async fn unban(&self, key: &str) {
         if let Ok(mut records) = self.records.write()
             && let Some(record) = records.get_mut(key)
         {
@@ -605,7 +609,7 @@ impl RateLimitStore for InMemoryFixedWindowStore {
         }
     }
 
-    fn cleanup(&self) {
+    async fn cleanup(&self) {
         if let Ok(mut records) = self.records.write() {
             let now = Instant::now();
             records.retain(|_, record| {
@@ -676,33 +680,33 @@ impl RateLimiter {
     ///
     /// 如果允许，记录请求并返回限制信息；
     /// 如果被限制，返回错误。
-    pub fn check(&self, key: &str) -> Result<RateLimitInfo> {
-        self.store.check_and_record(key, &self.config)
+    pub async fn check(&self, key: &str) -> Result<RateLimitInfo> {
+        self.store.check_and_record(key, &self.config).await
     }
 
     /// 获取当前状态（不记录请求）
-    pub fn status(&self, key: &str) -> RateLimitInfo {
-        self.store.get_status(key, &self.config)
+    pub async fn status(&self, key: &str) -> RateLimitInfo {
+        self.store.get_status(key, &self.config).await
     }
 
     /// 重置某个 key 的限制
-    pub fn reset(&self, key: &str) {
-        self.store.reset(key);
+    pub async fn reset(&self, key: &str) {
+        self.store.reset(key).await;
     }
 
     /// 手动封禁某个 key
-    pub fn ban(&self, key: &str, duration: Duration) {
-        self.store.ban(key, duration);
+    pub async fn ban(&self, key: &str, duration: Duration) {
+        self.store.ban(key, duration).await;
     }
 
     /// 解除封禁
-    pub fn unban(&self, key: &str) {
-        self.store.unban(key);
+    pub async fn unban(&self, key: &str) {
+        self.store.unban(key).await;
     }
 
     /// 清理过期记录
-    pub fn cleanup(&self) {
-        self.store.cleanup();
+    pub async fn cleanup(&self) {
+        self.store.cleanup().await;
     }
 
     /// 获取配置
@@ -918,11 +922,11 @@ impl CompositeRateLimiter {
     ///
     /// 所有限制器都必须允许请求才能通过。
     /// 注意：即使后面的限制器拒绝，前面的限制器仍会记录请求。
-    pub fn check(&self, key: &str) -> Result<Vec<RateLimitInfo>> {
+    pub async fn check(&self, key: &str) -> Result<Vec<RateLimitInfo>> {
         let mut infos = Vec::with_capacity(self.limiters.len());
 
         for limiter in &self.limiters {
-            let info = limiter.check(key)?;
+            let info = limiter.check(key).await?;
             infos.push(info);
         }
 
@@ -930,17 +934,20 @@ impl CompositeRateLimiter {
     }
 
     /// 获取所有限制器的状态
-    pub fn status(&self, key: &str) -> Vec<RateLimitInfo> {
-        self.limiters
-            .iter()
-            .map(|limiter| limiter.status(key))
-            .collect()
+    pub async fn status(&self, key: &str) -> Vec<RateLimitInfo> {
+        let mut results = Vec::new();
+
+        for limiter in &self.limiters {
+            results.push(limiter.status(key).await);
+        }
+
+        results
     }
 
     /// 重置所有限制器
-    pub fn reset(&self, key: &str) {
+    pub async fn reset(&self, key: &str) {
         for limiter in &self.limiters {
-            limiter.reset(key);
+            limiter.reset(key).await;
         }
     }
 }
@@ -950,8 +957,8 @@ mod tests {
     use super::*;
     use std::thread;
 
-    #[test]
-    fn test_rate_limiter_basic() {
+    #[tokio::test]
+    async fn test_rate_limiter_basic() {
         let config = RateLimitConfig::new()
             .with_max_requests(3)
             .with_window(Duration::from_secs(60));
@@ -960,16 +967,16 @@ mod tests {
         let key = "test:user";
 
         // 前三次应该成功
-        assert!(limiter.check(key).is_ok());
-        assert!(limiter.check(key).is_ok());
-        assert!(limiter.check(key).is_ok());
+        assert!(limiter.check(key).await.is_ok());
+        assert!(limiter.check(key).await.is_ok());
+        assert!(limiter.check(key).await.is_ok());
 
         // 第四次应该失败
-        assert!(limiter.check(key).is_err());
+        assert!(limiter.check(key).await.is_err());
     }
 
-    #[test]
-    fn test_rate_limiter_reset() {
+    #[tokio::test]
+    async fn test_rate_limiter_reset() {
         let config = RateLimitConfig::new()
             .with_max_requests(2)
             .with_window(Duration::from_secs(60));
@@ -977,17 +984,17 @@ mod tests {
 
         let key = "test:reset";
 
-        assert!(limiter.check(key).is_ok());
-        assert!(limiter.check(key).is_ok());
-        assert!(limiter.check(key).is_err());
+        assert!(limiter.check(key).await.is_ok());
+        assert!(limiter.check(key).await.is_ok());
+        assert!(limiter.check(key).await.is_err());
 
         // 重置后应该可以继续
-        limiter.reset(key);
-        assert!(limiter.check(key).is_ok());
+        limiter.reset(key).await;
+        assert!(limiter.check(key).await.is_ok());
     }
 
-    #[test]
-    fn test_rate_limiter_status() {
+    #[tokio::test]
+    async fn test_rate_limiter_status() {
         let config = RateLimitConfig::new()
             .with_max_requests(5)
             .with_window(Duration::from_secs(60));
@@ -995,19 +1002,19 @@ mod tests {
 
         let key = "test:status";
 
-        let status = limiter.status(key);
+        let status = limiter.status(key).await;
         assert_eq!(status.remaining, 5);
         assert_eq!(status.limit, 5);
 
-        limiter.check(key).unwrap();
-        limiter.check(key).unwrap();
+        limiter.check(key).await.unwrap();
+        limiter.check(key).await.unwrap();
 
-        let status = limiter.status(key);
+        let status = limiter.status(key).await;
         assert_eq!(status.remaining, 3);
     }
 
-    #[test]
-    fn test_rate_limiter_ban() {
+    #[tokio::test]
+    async fn test_rate_limiter_ban() {
         let config = RateLimitConfig::new()
             .with_max_requests(5)
             .with_window(Duration::from_secs(60));
@@ -1016,20 +1023,20 @@ mod tests {
         let key = "test:ban";
 
         // 手动封禁
-        limiter.ban(key, Duration::from_secs(60));
+        limiter.ban(key, Duration::from_secs(60)).await;
 
         // 应该被拒绝
-        assert!(limiter.check(key).is_err());
+        assert!(limiter.check(key).await.is_err());
 
         // 解除封禁
-        limiter.unban(key);
+        limiter.unban(key).await;
 
         // 应该可以继续
-        assert!(limiter.check(key).is_ok());
+        assert!(limiter.check(key).await.is_ok());
     }
 
-    #[test]
-    fn test_fixed_window_limiter() {
+    #[tokio::test]
+    async fn test_fixed_window_limiter() {
         let config = RateLimitConfig::new()
             .with_max_requests(3)
             .with_window(Duration::from_secs(60))
@@ -1038,10 +1045,10 @@ mod tests {
 
         let key = "test:fixed";
 
-        assert!(limiter.check(key).is_ok());
-        assert!(limiter.check(key).is_ok());
-        assert!(limiter.check(key).is_ok());
-        assert!(limiter.check(key).is_err());
+        assert!(limiter.check(key).await.is_ok());
+        assert!(limiter.check(key).await.is_ok());
+        assert!(limiter.check(key).await.is_ok());
+        assert!(limiter.check(key).await.is_err());
     }
 
     #[test]
@@ -1080,8 +1087,8 @@ mod tests {
         assert!(tokens > 0.0);
     }
 
-    #[test]
-    fn test_composite_limiter() {
+    #[tokio::test]
+    async fn test_composite_limiter() {
         let limiter1 = Arc::new(RateLimiter::new(
             RateLimitConfig::new()
                 .with_max_requests(2)
@@ -1098,11 +1105,11 @@ mod tests {
         let key = "test:composite";
 
         // 前两次应该成功
-        assert!(composite.check(key).is_ok());
-        assert!(composite.check(key).is_ok());
+        assert!(composite.check(key).await.is_ok());
+        assert!(composite.check(key).await.is_ok());
 
         // 第三次应该失败（limiter1 限制）
-        assert!(composite.check(key).is_err());
+        assert!(composite.check(key).await.is_err());
     }
 
     #[test]
@@ -1120,8 +1127,8 @@ mod tests {
         assert_eq!(config.window, Duration::from_secs(60));
     }
 
-    #[test]
-    fn test_remaining_count() {
+    #[tokio::test]
+    async fn test_remaining_count() {
         let config = RateLimitConfig::new()
             .with_max_requests(5)
             .with_window(Duration::from_secs(60));
@@ -1129,14 +1136,14 @@ mod tests {
 
         let key = "test:remaining";
 
-        let info = limiter.check(key).unwrap();
+        let info = limiter.check(key).await.unwrap();
         assert_eq!(info.remaining, 4);
         assert_eq!(info.limit, 5);
 
-        let info = limiter.check(key).unwrap();
+        let info = limiter.check(key).await.unwrap();
         assert_eq!(info.remaining, 3);
 
-        let info = limiter.check(key).unwrap();
+        let info = limiter.check(key).await.unwrap();
         assert_eq!(info.remaining, 2);
     }
 }

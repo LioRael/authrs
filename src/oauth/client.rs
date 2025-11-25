@@ -545,8 +545,8 @@ mod tests {
         assert!("invalid".parse::<GrantType>().is_err());
     }
 
-    #[test]
-    fn test_in_memory_store() {
+    #[tokio::test]
+    async fn test_in_memory_store() {
         let mut store = InMemoryClientStore::new();
 
         let (client, _) = OAuthClient::builder()
@@ -557,11 +557,11 @@ mod tests {
 
         let client_id = client.client_id.clone();
 
-        store.save(&client).unwrap();
-        assert!(store.find_by_id(&client_id).unwrap().is_some());
-        assert_eq!(store.list().unwrap().len(), 1);
+        store.save(&client).await.unwrap();
+        assert!(store.find_by_id(&client_id).await.unwrap().is_some());
+        assert_eq!(store.list().await.unwrap().len(), 1);
 
-        store.delete(&client_id).unwrap();
-        assert!(store.find_by_id(&client_id).unwrap().is_none());
+        store.delete(&client_id).await.unwrap();
+        assert!(store.find_by_id(&client_id).await.unwrap().is_none());
     }
 }
