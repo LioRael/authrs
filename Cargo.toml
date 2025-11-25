@@ -26,8 +26,11 @@ jwt = ["dep:jsonwebtoken"]
 # MFA (TOTP/HOTP) 支持
 mfa = ["dep:sha1"]
 
+# WebAuthn / Passkeys 支持
+webauthn = ["dep:url", "dep:webauthn-rs"]
+
 # 完整功能
-full = ["argon2", "bcrypt", "jwt", "mfa"]
+full = ["argon2", "bcrypt", "jwt", "mfa", "webauthn"]
 
 [dependencies]
 # 密码哈希 (可选)
@@ -70,6 +73,12 @@ subtle = "2.6"
 # HMAC 和 SHA2 (用于 CSRF, security, 以及 MFA 的 SHA256/SHA512)
 hmac = "0.12"
 sha2 = "0.10"
+
+# WebAuthn / Passkeys (可选)
+url = { version = "2.5", optional = true }
+webauthn-rs = { version = "0.5", features = [
+    "danger-allow-state-serialisation",
+], optional = true }
 
 # 系统随机数 (用于密码盐生成，避免 rand_core 版本冲突)
 getrandom = "0.3"

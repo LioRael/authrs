@@ -16,6 +16,7 @@
 //! - **OAuth 2.0**: OAuth 客户端、PKCE、Token 内省
 //! - **API Key 管理**: 完整的 API Key 生命周期管理
 //! - **账户安全**: 账户锁定、登录追踪、递增延迟
+//! - **WebAuthn / Passkeys**: 无密码认证支持
 //!
 //! ## Features
 //!
@@ -25,6 +26,7 @@
 //! - `bcrypt` - 启用 bcrypt 密码哈希支持
 //! - `jwt` - 启用 JWT 支持（默认启用）
 //! - `mfa` - 启用 TOTP/HOTP 多因素认证（默认启用）
+//! - `webauthn` - 启用 WebAuthn / Passkeys 支持
 //! - `full` - 启用所有功能
 //!
 //! 默认启用的 features: `argon2`, `jwt`, `mfa`
@@ -164,6 +166,33 @@
 //!     }
 //! }
 //! ```
+//!
+//! ## WebAuthn / Passkeys 示例
+//!
+#![cfg_attr(feature = "webauthn", doc = "```rust,ignore")]
+#![cfg_attr(not(feature = "webauthn"), doc = "```rust,ignore")]
+//! use authrs::webauthn::{WebAuthnService, RegistrationManager, InMemoryCredentialStore};
+//!
+//! // 创建 WebAuthn 服务
+//! let service = WebAuthnService::new(
+//!     "example.com",
+//!     "https://example.com",
+//!     "My Application",
+//! ).unwrap();
+//!
+//! // 开始注册流程
+//! let reg_manager = service.registration_manager();
+//! let (challenge, state) = reg_manager.start_registration(
+//!     "user123",
+//!     "alice",
+//!     "Alice",
+//!     "My Passkey",
+//!     None,
+//! ).unwrap();
+//!
+//! // 将 challenge 发送给客户端进行处理...
+//! // 客户端完成后，使用 finish_registration 完成注册
+//! ```
 
 pub mod api_key;
 pub mod error;
@@ -173,6 +202,8 @@ pub mod password;
 pub mod random;
 pub mod security;
 pub mod token;
+#[cfg(feature = "webauthn")]
+pub mod webauthn;
 
 pub use error::{Error, Result};
 
@@ -270,4 +301,46 @@ pub use oauth::{
 pub use api_key::{
     ApiKey, ApiKeyBuilder, ApiKeyConfig, ApiKeyManager, ApiKeyStats, ApiKeyStatus, ApiKeyStore,
     InMemoryApiKeyStore,
+};
+
+// ============================================================================
+// WebAuthn / Passkeys 相关导出
+// ============================================================================
+
+#[cfg(feature = "webauthn")]
+pub use webauthn::{
+    // 认证流程
+    AuthenticationConfig,
+    AuthenticationError,
+    AuthenticationManager,
+    AuthenticationState,
+    AuthenticationStateStore,
+    // Re-exports from webauthn-rs
+    AuthenticatorAttachment,
+    CreationChallengeResponse,
+    // 凭证管理
+    CredentialStore,
+    CredentialStoreError,
+    InMemoryAuthenticationStateStore,
+    InMemoryCredentialStore,
+    // 注册流程
+    InMemoryRegistrationStateStore,
+    Passkey,
+    PublicKeyCredential,
+    RegisterPublicKeyCredential,
+    RegistrationConfig,
+    RegistrationError,
+    RegistrationManager,
+    RegistrationState,
+    RegistrationStateStore,
+    RequestChallengeResponse,
+    StoredCredential,
+    UserVerification,
+    Uuid,
+    WebAuthnAuthenticationResult,
+    // 服务封装
+    WebAuthnService,
+    WebAuthnServiceError,
+    Webauthn,
+    WebauthnBuilder,
 };

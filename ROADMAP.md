@@ -13,6 +13,7 @@
 | **security/account** | 账户锁定、登录追踪、递增延迟、IP 封禁 | ✅ 完成 |
 | **oauth/** | OAuth 客户端管理、PKCE (S256/plain)、Token 内省 | ✅ 完成 |
 | **api_key/** | API Key 管理（哈希存储、权限范围、过期、轮换） | ✅ 完成 |
+| **webauthn/** | WebAuthn / Passkeys（注册、认证、凭证管理） | ✅ 完成 |
 | **random.rs** | 安全随机数、常量时间比较 | ✅ 完成 |
 | **error.rs** | 统一错误类型 | ✅ 完成 |
 
@@ -42,23 +43,26 @@ src/oauth/
 - [ ] Authorization Code Flow (完整实现需要 HTTP 框架集成)
 - [ ] Refresh Token 流程 (完整实现需要 HTTP 框架集成)
 
-#### 2. WebAuthn / Passkeys 模块
+#### 2. ~~WebAuthn / Passkeys 模块~~ ✅ 已完成
 
 无密码认证是趋势，Apple/Google 都在推广。
 
 ```
 src/webauthn/
-├── mod.rs
-├── registration.rs   # 注册流程
-├── authentication.rs # 认证流程
-└── credential.rs     # 凭证管理
+├── mod.rs           ✅ 模块入口、WebAuthnService 封装
+├── registration.rs  ✅ 注册流程、配置、状态管理
+├── authentication.rs ✅ 认证流程、配置、状态管理
+└── credential.rs    ✅ 凭证管理、存储接口
 ```
 
 **功能点：**
-- [ ] 注册 (Registration) 流程
-- [ ] 认证 (Authentication) 流程
-- [ ] 凭证存储接口
-- [ ] 支持 Passkeys
+- [x] 注册 (Registration) 流程
+- [x] 认证 (Authentication) 流程
+- [x] 凭证存储接口 (CredentialStore trait)
+- [x] 支持 Passkeys (基于 webauthn-rs)
+- [x] 内存存储实现（用于测试/开发）
+- [x] 用户验证策略配置
+- [x] 会话状态管理
 
 ---
 
@@ -248,7 +252,7 @@ full = ["argon2", "bcrypt", "jwt", "mfa"]
 # 计划新增
 scrypt = ["dep:scrypt"]
 oauth = ["dep:oauth2"]
-webauthn = ["dep:webauthn-rs"]
+webauthn = ["dep:url", "dep:webauthn-rs"]
 rbac = []
 passwordless = []
 ```
@@ -261,12 +265,13 @@ passwordless = []
 - [x] OAuth 2.0 基础支持 (PKCE, 客户端管理, Token 内省)
 - [x] 账户锁定机制
 - [x] API Key 管理增强
+- [x] WebAuthn/Passkeys 支持
 - [ ] 集成测试
 
 ### v0.3.0
-- WebAuthn/Passkeys
 - 示例目录
 - 异步 Store 支持
+- 更完善的文档
 
 ### v0.4.0
 - RBAC 模块
