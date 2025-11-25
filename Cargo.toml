@@ -91,3 +91,16 @@ getrandom = "0.3"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }
+
+# 示例
+[[example]]
+name = "rbac_demo"
+required-features = ["rbac"]
+
+[[example]]
+name = "jwt_auth"
+required-features = ["jwt"]
+
+[[example]]
+name = "mfa_setup"
+required-features = ["mfa"]

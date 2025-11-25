@@ -201,7 +201,7 @@ fn test_client_store() {
         .unwrap();
 
     let client1_id = client1.client_id.clone();
-    store.save(&client1);
+    let _ = store.save(&client1);
 
     let (client2, _) = OAuthClient::builder()
         .name("Client 2")
@@ -213,7 +213,7 @@ fn test_client_store() {
         .unwrap();
 
     let client2_id = client2.client_id.clone();
-    store.save(&client2);
+    let _ = store.save(&client2);
 
     // 通过 ID 获取
     let retrieved1 = store.find_by_id(&client1_id).unwrap();
@@ -301,7 +301,7 @@ fn test_authorization_code_flow_simulation() {
 
     let client_id = client.client_id.clone();
     let secret = client_secret.unwrap();
-    client_store.save(&client);
+    let _ = client_store.save(&client);
 
     // === 步骤 2：生成 PKCE ===
     let pkce = PkceChallenge::new(PkceMethod::S256).unwrap();

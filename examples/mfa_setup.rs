@@ -248,7 +248,7 @@ fn main() {
 
             // 生成几个 HOTP 码
             println!("   📊 生成 HOTP 序列:");
-            for i in 0..5 {
+            for _i in 0..5 {
                 let counter_before = user_config.hotp_counter;
                 let code = mfa_service.generate_hotp(&mut user_config).unwrap();
                 println!("   计数器 {}: {}", counter_before, code);

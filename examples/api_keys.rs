@@ -147,6 +147,7 @@ struct KeyInfo {
 }
 
 struct KeySummary {
+    #[allow(dead_code)]
     key_id: String,
     hint: String,
     status: String,

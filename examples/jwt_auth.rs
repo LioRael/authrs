@@ -156,6 +156,7 @@ struct TokenClaims {
 struct RefreshResult {
     access_token: String,
     new_refresh_token: Option<String>,
+    #[allow(dead_code)]
     user_id: String,
 }
 
