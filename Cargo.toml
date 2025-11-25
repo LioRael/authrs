@@ -19,6 +19,19 @@ path = "src/lib.rs"
 # 默认启用最常用的功能
 default = ["argon2", "jwt", "mfa"]
 
+# 增强功能
+enhanced = [
+    "api-key",
+    "argon2",
+    "crypto",
+    "jwt",
+    "mfa",
+    "oauth",
+    "passwordless",
+    "rbac",
+    "webauthn",
+]
+
 # 密码哈希算法
 argon2 = ["dep:argon2"]
 bcrypt = ["dep:bcrypt"]
