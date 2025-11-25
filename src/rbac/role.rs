@@ -3,9 +3,11 @@
 //! 提供角色的创建、管理和继承功能。
 
 use super::permission::{Permission, PermissionSet};
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, RwLock};
 
 /// 角色定义
 ///
@@ -294,25 +296,26 @@ impl RoleBuilder {
 /// 角色存储 trait
 ///
 /// 定义角色持久化存储的接口
-pub trait RoleStore {
+#[async_trait]
+pub trait RoleStore: Send + Sync {
     /// 保存角色
-    fn save(&mut self, role: Role);
+    async fn save(&self, role: Role) -> Result<(), ()>;
 
     /// 根据 ID 获取角色
-    fn get(&self, id: &str) -> Option<&Role>;
+    async fn get(&self, id: &str) -> Option<Role>;
 
-    /// 根据 ID 获取可变角色引用
-    fn get_mut(&mut self, id: &str) -> Option<&mut Role>;
+    /// 更新/替换角色
+    async fn update(&self, role: Role) -> Result<(), ()>;
 
-    /// 删除角色
-    fn delete(&mut self, id: &str) -> Option<Role>;
+    /// 删除角色，返回被删除的角色
+    async fn delete(&self, id: &str) -> Option<Role>;
 
     /// 列出所有角色
-    fn list(&self) -> Vec<&Role>;
+    async fn list(&self) -> Vec<Role>;
 
     /// 检查角色是否存在
-    fn exists(&self, id: &str) -> bool {
-        self.get(id).is_some()
+    async fn exists(&self, id: &str) -> bool {
+        self.get(id).await.is_some()
     }
 }
 
@@ -325,52 +328,62 @@ pub trait RoleStore {
 /// 用于测试和开发环境
 #[derive(Debug, Default)]
 pub struct InMemoryRoleStore {
-    roles: HashMap<String, Role>,
+    roles: RwLock<HashMap<String, Role>>,
 }
 
 impl InMemoryRoleStore {
     /// 创建新的内存存储
     pub fn new() -> Self {
-        Self {
-            roles: HashMap::new(),
-        }
+        Self::default()
     }
 
     /// 获取角色数量
     pub fn len(&self) -> usize {
-        self.roles.len()
+        self.roles.read().map(|m| m.len()).unwrap_or(0)
     }
 
     /// 检查是否为空
     pub fn is_empty(&self) -> bool {
-        self.roles.is_empty()
+        self.roles.read().map(|m| m.is_empty()).unwrap_or(true)
     }
 
     /// 清空所有角色
     pub fn clear(&mut self) {
-        self.roles.clear();
+        if let Ok(mut roles) = self.roles.write() {
+            roles.clear();
+        }
     }
 }
 
+#[async_trait]
 impl RoleStore for InMemoryRoleStore {
-    fn save(&mut self, role: Role) {
-        self.roles.insert(role.id.clone(), role);
+    async fn save(&self, role: Role) -> Result<(), ()> {
+        if let Ok(mut roles) = self.roles.write() {
+            roles.insert(role.id.clone(), role);
+        }
+        Ok(())
     }
 
-    fn get(&self, id: &str) -> Option<&Role> {
-        self.roles.get(id)
+    async fn get(&self, id: &str) -> Option<Role> {
+        self.roles.read().ok().and_then(|m| m.get(id).cloned())
     }
 
-    fn get_mut(&mut self, id: &str) -> Option<&mut Role> {
-        self.roles.get_mut(id)
+    async fn update(&self, role: Role) -> Result<(), ()> {
+        if let Ok(mut roles) = self.roles.write() {
+            roles.insert(role.id.clone(), role);
+        }
+        Ok(())
     }
 
-    fn delete(&mut self, id: &str) -> Option<Role> {
-        self.roles.remove(id)
+    async fn delete(&self, id: &str) -> Option<Role> {
+        self.roles.write().ok().and_then(|mut m| m.remove(id))
     }
 
-    fn list(&self) -> Vec<&Role> {
-        self.roles.values().collect()
+    async fn list(&self) -> Vec<Role> {
+        self.roles
+            .read()
+            .map(|m| m.values().cloned().collect())
+            .unwrap_or_default()
     }
 }
 
@@ -407,7 +420,7 @@ impl RoleStore for InMemoryRoleStore {
 /// let permissions = manager.get_effective_permissions("editor");
 /// ```
 pub struct RoleManager {
-    store: InMemoryRoleStore,
+    store: Arc<dyn RoleStore>,
 }
 
 impl Default for RoleManager {
@@ -420,104 +433,95 @@ impl RoleManager {
     /// 创建新的角色管理器
     pub fn new() -> Self {
         Self {
-            store: InMemoryRoleStore::new(),
+            store: Arc::new(InMemoryRoleStore::new()),
+        }
+    }
+
+    /// 使用自定义存储创建管理器
+    pub fn with_store<S: RoleStore + 'static>(store: S) -> Self {
+        Self {
+            store: Arc::new(store),
         }
     }
 
     /// 添加角色
-    pub fn add_role(&mut self, role: Role) {
-        self.store.save(role);
+    pub async fn add_role(&self, role: Role) {
+        let _ = self.store.save(role).await;
     }
 
     /// 获取角色
-    pub fn get_role(&self, id: &str) -> Option<&Role> {
-        self.store.get(id)
-    }
-
-    /// 获取可变角色引用
-    pub fn get_role_mut(&mut self, id: &str) -> Option<&mut Role> {
-        self.store.get_mut(id)
+    pub async fn get_role(&self, id: &str) -> Option<Role> {
+        self.store.get(id).await
     }
 
     /// 删除角色
-    pub fn remove_role(&mut self, id: &str) -> Option<Role> {
-        self.store.delete(id)
+    pub async fn remove_role(&self, id: &str) -> Option<Role> {
+        self.store.delete(id).await
     }
 
     /// 列出所有角色
-    pub fn list_roles(&self) -> Vec<&Role> {
-        self.store.list()
+    pub async fn list_roles(&self) -> Vec<Role> {
+        self.store.list().await
     }
 
     /// 检查角色是否存在
-    pub fn role_exists(&self, id: &str) -> bool {
-        self.store.exists(id)
+    pub async fn role_exists(&self, id: &str) -> bool {
+        self.store.exists(id).await
     }
 
     /// 获取角色数量
-    pub fn role_count(&self) -> usize {
-        self.store.len()
+    pub async fn role_count(&self) -> usize {
+        self.store.list().await.len()
     }
 
     /// 获取角色的有效权限（包括继承的权限）
     ///
     /// 递归解析所有继承链上的权限
-    pub fn get_effective_permissions(&self, role_id: &str) -> PermissionSet {
+    pub async fn get_effective_permissions(&self, role_id: &str) -> PermissionSet {
         let mut permissions = PermissionSet::new();
         let mut visited = HashSet::new();
-        self.collect_permissions(role_id, &mut permissions, &mut visited);
-        permissions
-    }
+        let mut stack = vec![role_id.to_string()];
 
-    /// 递归收集权限
-    fn collect_permissions(
-        &self,
-        role_id: &str,
-        permissions: &mut PermissionSet,
-        visited: &mut HashSet<String>,
-    ) {
-        // 防止循环继承
-        if visited.contains(role_id) {
-            return;
-        }
-        visited.insert(role_id.to_string());
+        while let Some(current) = stack.pop() {
+            if !visited.insert(current.clone()) {
+                continue;
+            }
 
-        if let Some(role) = self.store.get(role_id) {
-            // 只收集启用的角色的权限
-            if role.enabled {
-                // 添加直接权限
-                permissions.merge(role.permissions());
-
-                // 递归收集继承的权限
-                for parent_id in role.inherits() {
-                    self.collect_permissions(parent_id, permissions, visited);
+            if let Some(role) = self.store.get(&current).await {
+                if role.enabled {
+                    permissions.merge(role.permissions());
+                    for parent_id in role.inherits() {
+                        stack.push(parent_id.clone());
+                    }
                 }
             }
         }
+
+        permissions
     }
 
     /// 检查角色是否有特定权限（包括继承）
-    pub fn role_has_permission(&self, role_id: &str, permission: &Permission) -> bool {
-        let effective = self.get_effective_permissions(role_id);
+    pub async fn role_has_permission(&self, role_id: &str, permission: &Permission) -> bool {
+        let effective = self.get_effective_permissions(role_id).await;
         effective.contains(permission)
     }
 
     /// 获取用户的所有有效权限
     ///
     /// 用户可以拥有多个角色
-    pub fn get_user_permissions(&self, role_ids: &[&str]) -> PermissionSet {
+    pub async fn get_user_permissions(&self, role_ids: &[&str]) -> PermissionSet {
         let mut permissions = PermissionSet::new();
         for role_id in role_ids {
-            let role_permissions = self.get_effective_permissions(role_id);
+            let role_permissions = self.get_effective_permissions(role_id).await;
             permissions.merge(&role_permissions);
         }
         permissions
     }
 
     /// 检查用户是否有特定权限
-    pub fn user_has_permission(&self, role_ids: &[&str], permission: &Permission) -> bool {
+    pub async fn user_has_permission(&self, role_ids: &[&str], permission: &Permission) -> bool {
         for role_id in role_ids {
-            if self.role_has_permission(role_id, permission) {
+            if self.role_has_permission(role_id, permission).await {
                 return true;
             }
         }
@@ -525,75 +529,79 @@ impl RoleManager {
     }
 
     /// 检查用户是否有所有指定权限
-    pub fn user_has_all_permissions(&self, role_ids: &[&str], permissions: &[Permission]) -> bool {
-        let user_perms = self.get_user_permissions(role_ids);
+    pub async fn user_has_all_permissions(
+        &self,
+        role_ids: &[&str],
+        permissions: &[Permission],
+    ) -> bool {
+        let user_perms = self.get_user_permissions(role_ids).await;
         user_perms.contains_all(permissions)
     }
 
     /// 检查用户是否有任意一个指定权限
-    pub fn user_has_any_permission(&self, role_ids: &[&str], permissions: &[Permission]) -> bool {
-        let user_perms = self.get_user_permissions(role_ids);
+    pub async fn user_has_any_permission(
+        &self,
+        role_ids: &[&str],
+        permissions: &[Permission],
+    ) -> bool {
+        let user_perms = self.get_user_permissions(role_ids).await;
         user_perms.contains_any(permissions)
     }
 
     /// 获取角色的继承链
     ///
     /// 返回所有直接和间接继承的角色 ID
-    pub fn get_inheritance_chain(&self, role_id: &str) -> Vec<String> {
+    pub async fn get_inheritance_chain(&self, role_id: &str) -> Vec<String> {
         let mut chain = Vec::new();
         let mut visited = HashSet::new();
-        self.collect_inheritance_chain(role_id, &mut chain, &mut visited);
+        let mut stack = vec![role_id.to_string()];
+
+        while let Some(current) = stack.pop() {
+            if !visited.insert(current.clone()) {
+                continue;
+            }
+
+            if let Some(role) = self.store.get(&current).await {
+                for parent_id in role.inherits() {
+                    chain.push(parent_id.clone());
+                    stack.push(parent_id.clone());
+                }
+            }
+        }
+
         chain
     }
 
-    fn collect_inheritance_chain(
-        &self,
-        role_id: &str,
-        chain: &mut Vec<String>,
-        visited: &mut HashSet<String>,
-    ) {
-        if visited.contains(role_id) {
-            return;
-        }
-        visited.insert(role_id.to_string());
-
-        if let Some(role) = self.store.get(role_id) {
-            for parent_id in role.inherits() {
-                chain.push(parent_id.clone());
-                self.collect_inheritance_chain(parent_id, chain, visited);
-            }
-        }
-    }
-
     /// 检查继承关系是否会导致循环
-    pub fn would_create_cycle(&self, role_id: &str, parent_id: &str) -> bool {
+    pub async fn would_create_cycle(&self, role_id: &str, parent_id: &str) -> bool {
         // 如果要继承自己，直接返回 true
         if role_id == parent_id {
             return true;
         }
 
         // 检查 parent_id 的继承链中是否包含 role_id
-        let chain = self.get_inheritance_chain(parent_id);
+        let chain = self.get_inheritance_chain(parent_id).await;
         chain.contains(&role_id.to_string())
     }
 
     /// 安全地添加继承关系
     ///
     /// 如果会导致循环继承则返回错误
-    pub fn add_inheritance(&mut self, role_id: &str, parent_id: &str) -> Result<(), String> {
-        if self.would_create_cycle(role_id, parent_id) {
+    pub async fn add_inheritance(&self, role_id: &str, parent_id: &str) -> Result<(), String> {
+        if self.would_create_cycle(role_id, parent_id).await {
             return Err(format!(
                 "Adding inheritance from '{}' to '{}' would create a cycle",
                 parent_id, role_id
             ));
         }
 
-        if !self.store.exists(parent_id) {
+        if !self.store.exists(parent_id).await {
             return Err(format!("Parent role '{}' does not exist", parent_id));
         }
 
-        if let Some(role) = self.store.get_mut(role_id) {
+        if let Some(mut role) = self.store.get(role_id).await {
             role.inherit(parent_id);
+            let _ = self.store.save(role).await;
             Ok(())
         } else {
             Err(format!("Role '{}' does not exist", role_id))
@@ -631,8 +639,8 @@ mod tests {
         assert!(!role.has_permission(&write));
     }
 
-    #[test]
-    fn test_role_builder() {
+    #[tokio::test]
+    async fn test_role_builder() {
         let role = RoleBuilder::new("editor")
             .name("Content Editor")
             .description("Can edit content")
@@ -650,8 +658,8 @@ mod tests {
         assert_eq!(role.get_metadata("department"), Some("content"));
     }
 
-    #[test]
-    fn test_role_inheritance() {
+    #[tokio::test]
+    async fn test_role_inheritance() {
         let mut role = Role::new("admin", "Admin");
         role.inherit("editor");
         role.inherit("viewer");
@@ -664,8 +672,8 @@ mod tests {
         assert!(!role.inherits_from("editor"));
     }
 
-    #[test]
-    fn test_role_enable_disable() {
+    #[tokio::test]
+    async fn test_role_enable_disable() {
         let mut role = Role::new("test", "Test");
         assert!(role.is_enabled());
 
@@ -676,29 +684,29 @@ mod tests {
         assert!(role.is_enabled());
     }
 
-    #[test]
-    fn test_in_memory_store() {
-        let mut store = InMemoryRoleStore::new();
+    #[tokio::test]
+    async fn test_in_memory_store() {
+        let store = InMemoryRoleStore::new();
         assert!(store.is_empty());
 
         let role = Role::new("admin", "Admin");
-        store.save(role);
+        store.save(role).await.unwrap();
 
         assert_eq!(store.len(), 1);
-        assert!(store.exists("admin"));
-        assert!(!store.exists("unknown"));
+        assert!(store.exists("admin").await);
+        assert!(!store.exists("unknown").await);
 
-        let role = store.get("admin").unwrap();
+        let role = store.get("admin").await.unwrap();
         assert_eq!(role.id(), "admin");
 
-        let deleted = store.delete("admin");
+        let deleted = store.delete("admin").await;
         assert!(deleted.is_some());
         assert!(store.is_empty());
     }
 
-    #[test]
-    fn test_role_manager_basic() {
-        let mut manager = RoleManager::new();
+    #[tokio::test]
+    async fn test_role_manager_basic() {
+        let manager = RoleManager::new();
 
         let viewer = RoleBuilder::new("viewer")
             .permission(Permission::new("posts", "read"))
@@ -708,17 +716,17 @@ mod tests {
             .permission(Permission::new("posts", "write"))
             .build();
 
-        manager.add_role(viewer);
-        manager.add_role(editor);
+        manager.add_role(viewer).await;
+        manager.add_role(editor).await;
 
-        assert_eq!(manager.role_count(), 2);
-        assert!(manager.role_exists("viewer"));
-        assert!(manager.role_exists("editor"));
+        assert_eq!(manager.role_count().await, 2);
+        assert!(manager.role_exists("viewer").await);
+        assert!(manager.role_exists("editor").await);
     }
 
-    #[test]
-    fn test_role_manager_inheritance() {
-        let mut manager = RoleManager::new();
+    #[tokio::test]
+    async fn test_role_manager_inheritance() {
+        let manager = RoleManager::new();
 
         // 创建角色层级：viewer -> editor -> admin
         let viewer = RoleBuilder::new("viewer")
@@ -735,31 +743,31 @@ mod tests {
             .permission(Permission::new("posts", "delete"))
             .build();
 
-        manager.add_role(viewer);
-        manager.add_role(editor);
-        manager.add_role(admin);
+        manager.add_role(viewer).await;
+        manager.add_role(editor).await;
+        manager.add_role(admin).await;
 
         // viewer 只有 read 权限
-        let viewer_perms = manager.get_effective_permissions("viewer");
+        let viewer_perms = manager.get_effective_permissions("viewer").await;
         assert!(viewer_perms.contains(&Permission::new("posts", "read")));
         assert!(!viewer_perms.contains(&Permission::new("posts", "write")));
 
         // editor 有 read + write 权限
-        let editor_perms = manager.get_effective_permissions("editor");
+        let editor_perms = manager.get_effective_permissions("editor").await;
         assert!(editor_perms.contains(&Permission::new("posts", "read")));
         assert!(editor_perms.contains(&Permission::new("posts", "write")));
         assert!(!editor_perms.contains(&Permission::new("posts", "delete")));
 
         // admin 有所有权限
-        let admin_perms = manager.get_effective_permissions("admin");
+        let admin_perms = manager.get_effective_permissions("admin").await;
         assert!(admin_perms.contains(&Permission::new("posts", "read")));
         assert!(admin_perms.contains(&Permission::new("posts", "write")));
         assert!(admin_perms.contains(&Permission::new("posts", "delete")));
     }
 
-    #[test]
-    fn test_role_manager_disabled_role() {
-        let mut manager = RoleManager::new();
+    #[tokio::test]
+    async fn test_role_manager_disabled_role() {
+        let manager = RoleManager::new();
 
         let mut viewer = RoleBuilder::new("viewer")
             .permission(Permission::new("posts", "read"))
@@ -771,18 +779,18 @@ mod tests {
             .permission(Permission::new("posts", "write"))
             .build();
 
-        manager.add_role(viewer);
-        manager.add_role(editor);
+        manager.add_role(viewer).await;
+        manager.add_role(editor).await;
 
         // 禁用的角色权限不应该被继承
-        let editor_perms = manager.get_effective_permissions("editor");
+        let editor_perms = manager.get_effective_permissions("editor").await;
         assert!(editor_perms.contains(&Permission::new("posts", "write")));
         assert!(!editor_perms.contains(&Permission::new("posts", "read")));
     }
 
-    #[test]
-    fn test_user_permissions() {
-        let mut manager = RoleManager::new();
+    #[tokio::test]
+    async fn test_user_permissions() {
+        let manager = RoleManager::new();
 
         let viewer = RoleBuilder::new("viewer")
             .permission(Permission::new("posts", "read"))
@@ -792,54 +800,54 @@ mod tests {
             .permission(Permission::new("comments", "write"))
             .build();
 
-        manager.add_role(viewer);
-        manager.add_role(commenter);
+        manager.add_role(viewer).await;
+        manager.add_role(commenter).await;
 
         // 用户同时拥有两个角色
         let roles = ["viewer", "commenter"];
-        let user_perms = manager.get_user_permissions(&roles);
+        let user_perms = manager.get_user_permissions(&roles).await;
 
         assert!(user_perms.contains(&Permission::new("posts", "read")));
         assert!(user_perms.contains(&Permission::new("comments", "write")));
     }
 
-    #[test]
-    fn test_cycle_detection() {
-        let mut manager = RoleManager::new();
+    #[tokio::test]
+    async fn test_cycle_detection() {
+        let manager = RoleManager::new();
 
         let a = RoleBuilder::new("a").build();
         let b = RoleBuilder::new("b").inherit("a").build();
         let c = RoleBuilder::new("c").inherit("b").build();
 
-        manager.add_role(a);
-        manager.add_role(b);
-        manager.add_role(c);
+        manager.add_role(a).await;
+        manager.add_role(b).await;
+        manager.add_role(c).await;
 
         // 不应该允许 a 继承 c（会创建循环）
-        assert!(manager.would_create_cycle("a", "c"));
-        assert!(manager.would_create_cycle("a", "b"));
+        assert!(manager.would_create_cycle("a", "c").await);
+        assert!(manager.would_create_cycle("a", "b").await);
 
         // 这些不会创建循环
-        assert!(!manager.would_create_cycle("c", "a")); // c 已经间接继承 a
+        assert!(!manager.would_create_cycle("c", "a").await); // c 已经间接继承 a
 
         // 尝试添加会导致循环的继承
-        let result = manager.add_inheritance("a", "c");
+        let result = manager.add_inheritance("a", "c").await;
         assert!(result.is_err());
     }
 
-    #[test]
-    fn test_inheritance_chain() {
-        let mut manager = RoleManager::new();
+    #[tokio::test]
+    async fn test_inheritance_chain() {
+        let manager = RoleManager::new();
 
         let viewer = RoleBuilder::new("viewer").build();
         let editor = RoleBuilder::new("editor").inherit("viewer").build();
         let admin = RoleBuilder::new("admin").inherit("editor").build();
 
-        manager.add_role(viewer);
-        manager.add_role(editor);
-        manager.add_role(admin);
+        manager.add_role(viewer).await;
+        manager.add_role(editor).await;
+        manager.add_role(admin).await;
 
-        let chain = manager.get_inheritance_chain("admin");
+        let chain = manager.get_inheritance_chain("admin").await;
         assert!(chain.contains(&"editor".to_string()));
         assert!(chain.contains(&"viewer".to_string()));
     }

@@ -8,6 +8,7 @@ use authrs::rbac::{
     Action, Permission, PermissionSet, Policy, PolicyEffect, PolicyEngine, PolicyEvaluator,
     Resource, RoleBuilder, RoleManager, Subject,
 };
+use tokio;
 
 /// 测试权限定义和基本检查
 #[test]
@@ -96,9 +97,9 @@ fn test_role_basics() {
 }
 
 /// 测试角色继承
-#[test]
-fn test_role_inheritance() {
-    let mut manager = RoleManager::new();
+#[tokio::test]
+async fn test_role_inheritance() {
+    let manager = RoleManager::new();
 
     // 基础角色：查看者
     let viewer = RoleBuilder::new("viewer")
@@ -122,22 +123,22 @@ fn test_role_inheritance() {
         .permission(Permission::new("users", "write"))
         .build();
 
-    manager.add_role(viewer);
-    manager.add_role(editor);
-    manager.add_role(admin);
+    manager.add_role(viewer).await;
+    manager.add_role(editor).await;
+    manager.add_role(admin).await;
 
     // 验证有效权限（包含继承的权限）
-    let viewer_perms = manager.get_effective_permissions("viewer");
+    let viewer_perms = manager.get_effective_permissions("viewer").await;
     assert!(viewer_perms.contains(&Permission::new("posts", "read")));
     assert!(!viewer_perms.contains(&Permission::new("posts", "write")));
 
-    let editor_perms = manager.get_effective_permissions("editor");
+    let editor_perms = manager.get_effective_permissions("editor").await;
     assert!(editor_perms.contains(&Permission::new("posts", "read"))); // 继承自 viewer
     assert!(editor_perms.contains(&Permission::new("posts", "write"))); // 自己的
     assert!(editor_perms.contains(&Permission::new("comments", "read"))); // 继承自 viewer
     assert!(!editor_perms.contains(&Permission::new("posts", "delete")));
 
-    let admin_perms = manager.get_effective_permissions("admin");
+    let admin_perms = manager.get_effective_permissions("admin").await;
     assert!(admin_perms.contains(&Permission::new("posts", "read"))); // 继承链
     assert!(admin_perms.contains(&Permission::new("posts", "write"))); // 继承链
     assert!(admin_perms.contains(&Permission::new("posts", "delete"))); // 自己的
@@ -145,9 +146,9 @@ fn test_role_inheritance() {
 }
 
 /// 测试角色管理器的权限检查
-#[test]
-fn test_role_manager_permission_check() {
-    let mut manager = RoleManager::new();
+#[tokio::test]
+async fn test_role_manager_permission_check() {
+    let manager = RoleManager::new();
 
     let viewer = RoleBuilder::new("viewer")
         .permission(Permission::new("posts", "read"))
@@ -158,18 +159,38 @@ fn test_role_manager_permission_check() {
         .permission(Permission::new("posts", "write"))
         .build();
 
-    manager.add_role(viewer);
-    manager.add_role(editor);
+    manager.add_role(viewer).await;
+    manager.add_role(editor).await;
 
     // 使用管理器检查权限
-    assert!(manager.role_has_permission("viewer", &Permission::new("posts", "read")));
-    assert!(!manager.role_has_permission("viewer", &Permission::new("posts", "write")));
+    assert!(
+        manager
+            .role_has_permission("viewer", &Permission::new("posts", "read"))
+            .await
+    );
+    assert!(
+        !manager
+            .role_has_permission("viewer", &Permission::new("posts", "write"))
+            .await
+    );
 
-    assert!(manager.role_has_permission("editor", &Permission::new("posts", "read")));
-    assert!(manager.role_has_permission("editor", &Permission::new("posts", "write")));
+    assert!(
+        manager
+            .role_has_permission("editor", &Permission::new("posts", "read"))
+            .await
+    );
+    assert!(
+        manager
+            .role_has_permission("editor", &Permission::new("posts", "write"))
+            .await
+    );
 
     // 不存在的角色
-    assert!(!manager.role_has_permission("nonexistent", &Permission::new("posts", "read")));
+    assert!(
+        !manager
+            .role_has_permission("nonexistent", &Permission::new("posts", "read"))
+            .await
+    );
 }
 
 /// 测试策略引擎基础功能
@@ -437,10 +458,10 @@ fn test_remove_policy() {
 }
 
 /// 测试完整的 RBAC 工作流
-#[test]
-fn test_complete_rbac_workflow() {
+#[tokio::test]
+async fn test_complete_rbac_workflow() {
     // === 步骤1：定义角色层次结构 ===
-    let mut role_manager = RoleManager::new();
+    let role_manager = RoleManager::new();
 
     // 访客角色
     let guest = RoleBuilder::new("guest")
@@ -475,10 +496,10 @@ fn test_complete_rbac_workflow() {
         .permission(Permission::wildcard()) // 所有权限
         .build();
 
-    role_manager.add_role(guest);
-    role_manager.add_role(user);
-    role_manager.add_role(editor);
-    role_manager.add_role(admin);
+    role_manager.add_role(guest).await;
+    role_manager.add_role(user).await;
+    role_manager.add_role(editor).await;
+    role_manager.add_role(admin).await;
 
     // === 步骤2：配置策略引擎 ===
     let mut policy_engine = PolicyEngine::new();
@@ -557,7 +578,7 @@ fn test_complete_rbac_workflow() {
     assert!(can_delete_system.is_denied());
 
     // === 步骤4：验证角色权限继承 ===
-    let admin_perms = role_manager.get_effective_permissions("admin");
+    let admin_perms = role_manager.get_effective_permissions("admin").await;
     // 管理员应该有通配符权限，可以匹配任何权限
     assert!(!admin_perms.is_empty());
 }

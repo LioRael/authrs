@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use std::net::IpAddr;
 
 use crate::error::{Error, Result, StorageError};
+use async_trait::async_trait;
 
 /// 账户锁定配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -649,18 +650,19 @@ pub struct TrackerStats {
 /// 账户锁定存储 trait
 ///
 /// 实现此 trait 以提供持久化存储支持
+#[async_trait]
 pub trait AccountLockStore: Send + Sync {
     /// 保存账户状态
-    fn save(&mut self, status: &AccountLockStatus) -> Result<()>;
+    async fn save(&mut self, status: &AccountLockStatus) -> Result<()>;
 
     /// 加载账户状态
-    fn load(&self, account_id: &str) -> Result<Option<AccountLockStatus>>;
+    async fn load(&self, account_id: &str) -> Result<Option<AccountLockStatus>>;
 
     /// 删除账户状态
-    fn delete(&mut self, account_id: &str) -> Result<()>;
+    async fn delete(&mut self, account_id: &str) -> Result<()>;
 
     /// 列出所有被锁定的账户
-    fn list_locked(&self) -> Result<Vec<AccountLockStatus>>;
+    async fn list_locked(&self) -> Result<Vec<AccountLockStatus>>;
 }
 
 /// 内存存储实现
@@ -676,24 +678,25 @@ impl InMemoryAccountLockStore {
     }
 }
 
+#[async_trait]
 impl AccountLockStore for InMemoryAccountLockStore {
-    fn save(&mut self, status: &AccountLockStatus) -> Result<()> {
+    async fn save(&mut self, status: &AccountLockStatus) -> Result<()> {
         self.data.insert(status.account_id.clone(), status.clone());
         Ok(())
     }
 
-    fn load(&self, account_id: &str) -> Result<Option<AccountLockStatus>> {
+    async fn load(&self, account_id: &str) -> Result<Option<AccountLockStatus>> {
         Ok(self.data.get(account_id).cloned())
     }
 
-    fn delete(&mut self, account_id: &str) -> Result<()> {
+    async fn delete(&mut self, account_id: &str) -> Result<()> {
         self.data
             .remove(account_id)
             .ok_or_else(|| Error::Storage(StorageError::NotFound(account_id.to_string())))?;
         Ok(())
     }
 
-    fn list_locked(&self) -> Result<Vec<AccountLockStatus>> {
+    async fn list_locked(&self) -> Result<Vec<AccountLockStatus>> {
         Ok(self
             .data
             .values()
@@ -849,19 +852,19 @@ mod tests {
         assert_eq!(stats.currently_locked_accounts, 1);
     }
 
-    #[test]
-    fn test_in_memory_store() {
+    #[tokio::test]
+    async fn test_in_memory_store() {
         let mut store = InMemoryAccountLockStore::new();
 
         let status = AccountLockStatus::new("user1");
-        store.save(&status).unwrap();
+        store.save(&status).await.unwrap();
 
-        let loaded = store.load("user1").unwrap();
+        let loaded = store.load("user1").await.unwrap();
         assert!(loaded.is_some());
         assert_eq!(loaded.unwrap().account_id, "user1");
 
-        store.delete("user1").unwrap();
-        assert!(store.load("user1").unwrap().is_none());
+        store.delete("user1").await.unwrap();
+        assert!(store.load("user1").await.unwrap().is_none());
     }
 
     #[test]

@@ -9,6 +9,7 @@ name = "authrs"
 version = "0.1.0"
 
 [lib]
+doctest = false
 name = "authrs"
 path = "src/lib.rs"
 

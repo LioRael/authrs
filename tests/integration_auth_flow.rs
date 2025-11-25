@@ -45,8 +45,8 @@ fn test_user_registration_flow() {
 }
 
 /// 测试完整的登录流程（包括速率限制和账户锁定）
-#[test]
-fn test_login_flow_with_security() {
+#[tokio::test]
+async fn test_login_flow_with_security() {
     // 设置安全组件
     let rate_config = RateLimitConfig::new()
         .with_max_requests(5)
@@ -64,7 +64,7 @@ fn test_login_flow_with_security() {
     // 场景1：正常登录
     {
         // 检查速率限制
-        let rate_result = rate_limiter.check(&rate_key);
+        let rate_result = rate_limiter.check(&rate_key).await;
         assert!(rate_result.is_ok(), "Rate limit should allow request");
 
         // 检查账户锁定状态

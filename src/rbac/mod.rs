@@ -200,9 +200,9 @@ mod tests {
         assert!(decision.is_denied());
     }
 
-    #[test]
-    fn test_role_inheritance() {
-        let mut manager = RoleManager::new();
+    #[tokio::test]
+    async fn test_role_inheritance() {
+        let manager = RoleManager::new();
 
         // 基础角色
         let viewer = RoleBuilder::new("viewer")
@@ -215,11 +215,11 @@ mod tests {
             .permission(Permission::new("posts", "write"))
             .build();
 
-        manager.add_role(viewer);
-        manager.add_role(editor);
+        manager.add_role(viewer).await;
+        manager.add_role(editor).await;
 
         // 验证继承的权限
-        let effective = manager.get_effective_permissions("editor");
+        let effective = manager.get_effective_permissions("editor").await;
         assert!(effective.contains(&Permission::new("posts", "read")));
         assert!(effective.contains(&Permission::new("posts", "write")));
     }

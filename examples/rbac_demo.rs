@@ -8,9 +8,10 @@ use authrs::rbac::{
     Action, Permission, Policy, PolicyEngine, PolicyEvaluator, Resource, RoleBuilder, RoleManager,
     Subject,
 };
+use tokio::runtime::Runtime;
 
 /// 演示基本的角色和权限
-fn demo_basic_roles() {
+async fn demo_basic_roles() {
     println!("📚 基本角色和权限演示\n");
 
     // 创建权限
@@ -97,10 +98,10 @@ fn demo_basic_roles() {
 }
 
 /// 演示角色继承
-fn demo_role_inheritance() {
+async fn demo_role_inheritance() {
     println!("🔗 角色继承演示\n");
 
-    let mut manager = RoleManager::new();
+    let manager = RoleManager::new();
 
     // 创建角色层次结构
     // guest -> user -> moderator -> admin
@@ -134,14 +135,14 @@ fn demo_role_inheritance() {
         .permission(Permission::new("settings", "manage"))
         .build();
 
-    manager.add_role(guest);
-    manager.add_role(user);
-    manager.add_role(moderator);
-    manager.add_role(admin);
+    manager.add_role(guest).await;
+    manager.add_role(user).await;
+    manager.add_role(moderator).await;
+    manager.add_role(admin).await;
 
     // 显示各角色的有效权限
     for role_name in &["guest", "user", "moderator", "admin"] {
-        let perms = manager.get_effective_permissions(role_name);
+        let perms = manager.get_effective_permissions(role_name).await;
         println!("   角色: {} (共 {} 个权限)", role_name, perms.len());
         for perm in &perms {
             println!("      - {}", perm);
@@ -153,15 +154,27 @@ fn demo_role_inheritance() {
     println!("   权限检查:");
     println!(
         "   - admin 是否有 public:read (继承自 guest): {}",
-        bool_emoji(manager.role_has_permission("admin", &Permission::new("public", "read")))
+        bool_emoji(
+            manager
+                .role_has_permission("admin", &Permission::new("public", "read"))
+                .await,
+        )
     );
     println!(
         "   - admin 是否有 posts:create (继承自 user): {}",
-        bool_emoji(manager.role_has_permission("admin", &Permission::new("posts", "create")))
+        bool_emoji(
+            manager
+                .role_has_permission("admin", &Permission::new("posts", "create"))
+                .await,
+        )
     );
     println!(
         "   - user 是否有 settings:manage (admin 专属): {}",
-        bool_emoji(manager.role_has_permission("user", &Permission::new("settings", "manage")))
+        bool_emoji(
+            manager
+                .role_has_permission("user", &Permission::new("settings", "manage"))
+                .await,
+        )
     );
     println!();
 }
@@ -346,11 +359,11 @@ fn demo_multi_role_user() {
 }
 
 /// 演示实际应用场景
-fn demo_real_world_scenario() {
+async fn demo_real_world_scenario() {
     println!("🌐 实际应用场景演示\n");
     println!("   场景: 博客系统权限管理\n");
 
-    let mut role_manager = RoleManager::new();
+    let role_manager = RoleManager::new();
     let mut policy_engine = PolicyEngine::new();
 
     // 定义角色
@@ -393,15 +406,15 @@ fn demo_real_world_scenario() {
         .permission(Permission::new("settings", "manage"))
         .build();
 
-    role_manager.add_role(guest);
-    role_manager.add_role(member);
-    role_manager.add_role(author);
-    role_manager.add_role(moderator);
-    role_manager.add_role(admin);
+    role_manager.add_role(guest).await;
+    role_manager.add_role(member).await;
+    role_manager.add_role(author).await;
+    role_manager.add_role(moderator).await;
+    role_manager.add_role(admin).await;
 
     // 配置策略引擎
     for role_name in ["guest", "member", "author", "moderator", "admin"] {
-        let permissions = role_manager.get_effective_permissions(role_name);
+        let permissions = role_manager.get_effective_permissions(role_name).await;
         for perm in permissions {
             policy_engine.add_policy(
                 Policy::allow(format!(
@@ -509,11 +522,14 @@ fn bool_emoji(value: bool) -> &'static str {
 fn main() {
     println!("=== AuthRS RBAC 示例 ===\n");
 
-    demo_basic_roles();
-    println!("{}\n", "=".repeat(50));
+    let rt = Runtime::new().expect("failed to start runtime");
+    rt.block_on(async {
+        demo_basic_roles().await;
+        println!("{}\n", "=".repeat(50));
 
-    demo_role_inheritance();
-    println!("{}\n", "=".repeat(50));
+        demo_role_inheritance().await;
+        println!("{}\n", "=".repeat(50));
+    });
 
     demo_wildcard_permissions();
     println!("{}\n", "=".repeat(50));
@@ -524,7 +540,9 @@ fn main() {
     demo_multi_role_user();
     println!("{}\n", "=".repeat(50));
 
-    demo_real_world_scenario();
+    rt.block_on(async {
+        demo_real_world_scenario().await;
+    });
 
     println!("=== 示例结束 ===");
 }

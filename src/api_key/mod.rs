@@ -42,6 +42,7 @@
 //! }
 //! ```
 
+use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -616,24 +617,25 @@ pub struct ApiKeyStats {
 /// API Key 存储 trait
 ///
 /// 实现此 trait 以提供持久化存储
+#[async_trait]
 pub trait ApiKeyStore: Send + Sync {
     /// 保存 Key
-    fn save(&mut self, key: &ApiKey) -> Result<()>;
+    async fn save(&mut self, key: &ApiKey) -> Result<()>;
 
     /// 根据 ID 加载 Key
-    fn load(&self, id: &str) -> Result<Option<ApiKey>>;
+    async fn load(&self, id: &str) -> Result<Option<ApiKey>>;
 
     /// 根据哈希加载 Key
-    fn load_by_hash(&self, hash: &str) -> Result<Option<ApiKey>>;
+    async fn load_by_hash(&self, hash: &str) -> Result<Option<ApiKey>>;
 
     /// 删除 Key
-    fn delete(&mut self, id: &str) -> Result<()>;
+    async fn delete(&mut self, id: &str) -> Result<()>;
 
     /// 列出所有 Key
-    fn list(&self) -> Result<Vec<ApiKey>>;
+    async fn list(&self) -> Result<Vec<ApiKey>>;
 
     /// 根据所有者列出 Key
-    fn list_by_owner(&self, owner: &str) -> Result<Vec<ApiKey>>;
+    async fn list_by_owner(&self, owner: &str) -> Result<Vec<ApiKey>>;
 }
 
 /// 内存存储实现
@@ -650,37 +652,38 @@ impl InMemoryApiKeyStore {
     }
 }
 
+#[async_trait]
 impl ApiKeyStore for InMemoryApiKeyStore {
-    fn save(&mut self, key: &ApiKey) -> Result<()> {
+    async fn save(&mut self, key: &ApiKey) -> Result<()> {
         self.hash_index.insert(key.key_hash.clone(), key.id.clone());
         self.keys.insert(key.id.clone(), key.clone());
         Ok(())
     }
 
-    fn load(&self, id: &str) -> Result<Option<ApiKey>> {
+    async fn load(&self, id: &str) -> Result<Option<ApiKey>> {
         Ok(self.keys.get(id).cloned())
     }
 
-    fn load_by_hash(&self, hash: &str) -> Result<Option<ApiKey>> {
+    async fn load_by_hash(&self, hash: &str) -> Result<Option<ApiKey>> {
         let id = match self.hash_index.get(hash) {
             Some(id) => id,
             None => return Ok(None),
         };
-        self.load(id)
+        self.load(id).await
     }
 
-    fn delete(&mut self, id: &str) -> Result<()> {
+    async fn delete(&mut self, id: &str) -> Result<()> {
         if let Some(key) = self.keys.remove(id) {
             self.hash_index.remove(&key.key_hash);
         }
         Ok(())
     }
 
-    fn list(&self) -> Result<Vec<ApiKey>> {
+    async fn list(&self) -> Result<Vec<ApiKey>> {
         Ok(self.keys.values().cloned().collect())
     }
 
-    fn list_by_owner(&self, owner: &str) -> Result<Vec<ApiKey>> {
+    async fn list_by_owner(&self, owner: &str) -> Result<Vec<ApiKey>> {
         Ok(self
             .keys
             .values()
@@ -932,8 +935,8 @@ mod tests {
         assert_eq!(stats.revoked, 1);
     }
 
-    #[test]
-    fn test_in_memory_store() {
+    #[tokio::test]
+    async fn test_in_memory_store() {
         let mut store = InMemoryApiKeyStore::new();
 
         let manager = ApiKeyManager::with_default_config();
@@ -941,16 +944,16 @@ mod tests {
         let id = key.id.clone();
         let hash = key.key_hash.clone();
 
-        store.save(&key).unwrap();
+        store.save(&key).await.unwrap();
 
-        assert!(store.load(&id).unwrap().is_some());
-        assert!(store.load_by_hash(&hash).unwrap().is_some());
+        assert!(store.load(&id).await.unwrap().is_some());
+        assert!(store.load_by_hash(&hash).await.unwrap().is_some());
 
-        let list = store.list().unwrap();
+        let list = store.list().await.unwrap();
         assert_eq!(list.len(), 1);
 
-        store.delete(&id).unwrap();
-        assert!(store.load(&id).unwrap().is_none());
+        store.delete(&id).await.unwrap();
+        assert!(store.load(&id).await.unwrap().is_none());
     }
 
     #[test]
