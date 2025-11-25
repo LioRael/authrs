@@ -1,4 +1,5 @@
 [package]
+authors = ["LioRael <lioraeldev@gmail.com>"]
 categories = ["authentication", "cryptography"]
 description = "A comprehensive authentication library for Rust"
 edition = "2024"
