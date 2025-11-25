@@ -5,7 +5,7 @@
 #[cfg(feature = "argon2")]
 use argon2::{
     Argon2, PasswordHash, PasswordVerifier,
-    password_hash::{PasswordHasher as Argon2Hasher, SaltString, rand_core::OsRng},
+    password_hash::{PasswordHasher as Argon2Hasher, SaltString},
 };
 
 use crate::error::{Error, PasswordHashError, Result};
@@ -208,7 +208,20 @@ impl PasswordHasher {
 
     #[cfg(feature = "argon2")]
     fn hash_argon2(&self, password: &str) -> Result<String> {
-        let salt = SaltString::generate(&mut OsRng);
+        // Generate 16 bytes of random data for salt using getrandom
+        let mut salt_bytes = [0u8; 16];
+        getrandom::fill(&mut salt_bytes).map_err(|e| {
+            Error::PasswordHash(PasswordHashError::HashFailed(format!(
+                "Failed to generate random salt: {}",
+                e
+            )))
+        })?;
+        let salt = SaltString::encode_b64(&salt_bytes).map_err(|e| {
+            Error::PasswordHash(PasswordHashError::HashFailed(format!(
+                "Failed to encode salt: {}",
+                e
+            )))
+        })?;
         let argon2 = Argon2::default();
 
         argon2

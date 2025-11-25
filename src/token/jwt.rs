@@ -38,9 +38,10 @@
 
 use chrono::{Duration, Utc};
 use jsonwebtoken::{
-    decode, encode, Algorithm, DecodingKey, EncodingKey, Header, TokenData, Validation,
+    Algorithm, DecodingKey, EncodingKey, Header, TokenData, Validation, dangerous::insecure_decode,
+    decode, encode,
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::collections::HashMap;
 
 use crate::error::{Error, Result, TokenError};
@@ -508,14 +509,7 @@ impl JwtValidator {
     ///
     /// 此方法不验证签名，不应在生产环境中使用
     pub fn decode_without_validation(token: &str) -> Result<Claims> {
-        let mut validation = Validation::default();
-        validation.insecure_disable_signature_validation();
-        validation.validate_exp = false;
-        validation.validate_nbf = false;
-
-        // 使用空密钥解码
-        let key = DecodingKey::from_secret(&[]);
-        let token_data: TokenData<Claims> = decode(token, &key, &validation).map_err(|e| {
+        let token_data: TokenData<Claims> = insecure_decode(token).map_err(|e| {
             Error::Token(TokenError::DecodingFailed(format!(
                 "failed to decode JWT: {}",
                 e

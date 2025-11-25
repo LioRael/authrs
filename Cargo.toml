@@ -30,19 +30,21 @@ full = ["argon2", "bcrypt", "jwt", "mfa"]
 
 [dependencies]
 # 密码哈希 (可选)
-argon2 = { version = "0.5", optional = true }
-bcrypt = { version = "0.15", optional = true }
+argon2 = { version = "0.6.0-rc.2", optional = true }
+bcrypt = { version = "0.17", optional = true }
 
-# JWT (可选)
-jsonwebtoken = { version = "9", optional = true }
+# JWT (可选) - 使用 rust_crypto 后端和 PEM 支持
+jsonwebtoken = { version = "10", optional = true, default-features = false, features = [
+    "rust_crypto",
+    "use_pem",
+] }
 
 # MFA 依赖 - sha1 用于 TOTP/HOTP (可选)
 sha1 = { version = "0.10", optional = true }
 
 # 核心依赖 (始终需要)
 # 安全随机数
-rand = "0.8"
-rand_core = "0.6"
+rand = "0.10.0-rc.5"
 
 # 序列化
 serde = { version = "1.0", features = ["derive"] }
@@ -52,7 +54,7 @@ serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 
 # 错误处理
-thiserror = "1.0"
+thiserror = "2"
 
 # Base64/Base32 编码
 base32 = "0.5"
@@ -62,11 +64,14 @@ base64 = "0.22"
 urlencoding = "2.1"
 
 # 常量时间比较（防止时序攻击）
-subtle = "2.5"
+subtle = "2.6"
 
 # HMAC 和 SHA2 (用于 CSRF, security, 以及 MFA 的 SHA256/SHA512)
 hmac = "0.12"
 sha2 = "0.10"
+
+# 系统随机数 (用于密码盐生成，避免 rand_core 版本冲突)
+getrandom = "0.3"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }

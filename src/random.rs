@@ -2,8 +2,7 @@
 //!
 //! 提供密码学安全的随机数生成功能，用于生成 token、密钥等敏感数据。
 
-use rand::{distributions::Alphanumeric, Rng};
-use rand_core::{OsRng, RngCore};
+use rand::{Rng, TryRngCore, distr::Alphanumeric, rngs::OsRng};
 
 use crate::error::{CryptoError, Error, Result};
 
@@ -31,7 +30,7 @@ pub fn generate_random_bytes(length: usize) -> Result<Vec<u8>> {
     let mut bytes = vec![0u8; length];
     OsRng
         .try_fill_bytes(&mut bytes)
-        .map_err(|e| Error::Crypto(CryptoError::RngFailed(e.to_string())))?;
+        .map_err(|e| Error::Crypto(CryptoError::RngFailed(format!("{:?}", e))))?;
     Ok(bytes)
 }
 
@@ -81,7 +80,7 @@ pub fn generate_random_hex(byte_length: usize) -> Result<String> {
 /// assert!(!token.contains('/'));
 /// ```
 pub fn generate_random_base64_url(byte_length: usize) -> Result<String> {
-    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+    use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
     let bytes = generate_random_bytes(byte_length)?;
     Ok(URL_SAFE_NO_PAD.encode(&bytes))
 }
@@ -108,8 +107,8 @@ pub fn generate_random_base64_url(byte_length: usize) -> Result<String> {
 /// assert!(token.chars().all(|c| c.is_alphanumeric()));
 /// ```
 pub fn generate_random_alphanumeric(length: usize) -> Result<String> {
-    let token: String = rand::thread_rng()
-        .sample_iter(&Alphanumeric)
+    let token: String = rand::rng()
+        .sample_iter(Alphanumeric)
         .take(length)
         .map(char::from)
         .collect();
@@ -219,7 +218,7 @@ pub fn generate_recovery_codes(count: usize) -> Result<Vec<String>> {
             if i == 4 {
                 code.push('-');
             }
-            let idx = OsRng.gen_range(0..CHARSET.len());
+            let idx = rand::rng().random_range(0..CHARSET.len());
             code.push(CHARSET[idx] as char);
         }
 
@@ -252,7 +251,7 @@ pub fn generate_csrf_token() -> Result<String> {
 ///
 /// 返回密码学安全的随机 u64
 pub fn generate_random_u64() -> u64 {
-    OsRng.next_u64()
+    rand::rng().random()
 }
 
 /// 生成指定范围内的随机数
@@ -266,7 +265,7 @@ pub fn generate_random_u64() -> u64 {
 ///
 /// 返回 [min, max) 范围内的随机数
 pub fn generate_random_in_range(min: u64, max: u64) -> u64 {
-    OsRng.gen_range(min..max)
+    rand::rng().random_range(min..max)
 }
 
 // ============================================================================
