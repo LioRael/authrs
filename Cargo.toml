@@ -1,0 +1,58 @@
+[package]
+categories = ["authentication", "cryptography"]
+description = "A comprehensive authentication library for Rust"
+edition = "2024"
+keywords = ["auth", "authentication", "jwt", "password", "security"]
+license = "MIT"
+name = "authrs"
+version = "0.1.0"
+
+[lib]
+name = "authrs"
+path = "src/lib.rs"
+
+[dependencies]
+# 密码哈希
+argon2 = "0.5"
+bcrypt = "0.15"
+
+# 安全随机数
+rand = "0.8"
+rand_core = "0.6"
+
+# JWT
+jsonwebtoken = "9"
+
+# 序列化
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# 时间处理
+chrono = { version = "0.4", features = ["serde"] }
+
+# TOTP/HOTP
+totp-rs = { version = "5", features = ["gen_secret", "otpauth"] }
+
+# 错误处理
+thiserror = "1.0"
+
+# Base64 编码
+base64 = "0.22"
+
+# 常量时间比较（防止时序攻击）
+subtle = "2.5"
+
+# HMAC
+hmac = "0.12"
+sha2 = "0.10"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "test-util"] }
+
+[features]
+argon2 = []
+bcrypt = []
+default = ["argon2", "jwt", "totp"]
+full = ["argon2", "bcrypt", "jwt", "totp"]
+jwt = []
+totp = []
