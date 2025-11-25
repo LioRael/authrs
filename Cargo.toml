@@ -29,8 +29,14 @@ mfa = ["dep:sha1"]
 # WebAuthn / Passkeys 支持
 webauthn = ["dep:url", "dep:webauthn-rs"]
 
+# OAuth 2.0 支持
+oauth = []
+
+# RBAC (角色权限管理) 支持
+rbac = []
+
 # 完整功能
-full = ["argon2", "bcrypt", "jwt", "mfa", "webauthn"]
+full = ["argon2", "bcrypt", "jwt", "mfa", "oauth", "rbac", "webauthn"]
 
 [dependencies]
 # 密码哈希 (可选)

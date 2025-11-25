@@ -14,6 +14,7 @@
 | **oauth/** | OAuth 客户端管理、PKCE (S256/plain)、Token 内省 | ✅ 完成 |
 | **api_key/** | API Key 管理（哈希存储、权限范围、过期、轮换） | ✅ 完成 |
 | **webauthn/** | WebAuthn / Passkeys（注册、认证、凭证管理） | ✅ 完成 |
+| **rbac/** | 角色权限管理、策略引擎 | ✅ 完成 |
 | **random.rs** | 安全随机数、常量时间比较 | ✅ 完成 |
 | **error.rs** | 统一错误类型 | ✅ 完成 |
 
@@ -111,23 +112,25 @@ pub trait ApiKeyStore { ... }       // ✅ 存储 trait
 - [x] Key 轮换
 - [x] 使用统计
 
-#### 5. 权限/RBAC 模块
+#### 5. ~~权限/RBAC 模块~~ ✅ 已完成
 
 基础的角色权限管理。
 
 ```
 src/rbac/
-├── mod.rs
-├── role.rs        # 角色定义
-├── permission.rs  # 权限检查
-└── policy.rs      # 策略引擎
+├── mod.rs         ✅ 模块入口、文档、集成测试
+├── role.rs        ✅ 角色定义、继承、RoleManager
+├── permission.rs  ✅ 权限检查、通配符支持、PermissionSet
+└── policy.rs      ✅ 策略引擎、条件评估、Decision
 ```
 
 **功能点：**
-- [ ] 角色定义
-- [ ] 权限定义与检查
-- [ ] 角色-权限映射
-- [ ] 简单策略引擎
+- [x] 角色定义（Role, RoleBuilder, RoleStore）
+- [x] 权限定义与检查（Permission, PermissionSet, 通配符支持）
+- [x] 角色-权限映射（RoleManager, 继承链解析）
+- [x] 简单策略引擎（PolicyEngine, Policy, PolicyEffect）
+- [x] 基于属性的条件（PolicyCondition）
+- [x] 循环继承检测
 
 ---
 
@@ -266,6 +269,7 @@ passwordless = []
 - [x] 账户锁定机制
 - [x] API Key 管理增强
 - [x] WebAuthn/Passkeys 支持
+- [x] RBAC 模块（角色权限管理、策略引擎）
 - [ ] 集成测试
 
 ### v0.3.0
@@ -274,8 +278,8 @@ passwordless = []
 - 更完善的文档
 
 ### v0.4.0
-- RBAC 模块
 - Passwordless 认证
+- 安全 Cookie 助手
 
 ### v1.0.0
 - 完整文档

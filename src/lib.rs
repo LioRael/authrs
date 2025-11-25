@@ -17,6 +17,7 @@
 //! - **API Key 管理**: 完整的 API Key 生命周期管理
 //! - **账户安全**: 账户锁定、登录追踪、递增延迟
 //! - **WebAuthn / Passkeys**: 无密码认证支持
+//! - **RBAC**: 角色权限管理、策略引擎
 //!
 //! ## Features
 //!
@@ -26,6 +27,8 @@
 //! - `bcrypt` - 启用 bcrypt 密码哈希支持
 //! - `jwt` - 启用 JWT 支持（默认启用）
 //! - `mfa` - 启用 TOTP/HOTP 多因素认证（默认启用）
+//! - `oauth` - 启用 OAuth 2.0 支持（PKCE、客户端管理、Token 内省）
+//! - `rbac` - 启用 RBAC 角色权限管理支持
 //! - `webauthn` - 启用 WebAuthn / Passkeys 支持
 //! - `full` - 启用所有功能
 //!
@@ -96,7 +99,8 @@
 //!
 //! ## OAuth 2.0 示例
 //!
-//! ```rust
+#![cfg_attr(feature = "oauth", doc = "```rust")]
+#![cfg_attr(not(feature = "oauth"), doc = "```rust,ignore")]
 //! use authrs::oauth::{OAuthClient, ClientType, GrantType, PkceChallenge, PkceMethod};
 //!
 //! // 创建 OAuth 客户端
@@ -193,13 +197,56 @@
 //! // 将 challenge 发送给客户端进行处理...
 //! // 客户端完成后，使用 finish_registration 完成注册
 //! ```
+//!
+//! ## RBAC 角色权限示例
+//!
+#![cfg_attr(feature = "rbac", doc = "```rust")]
+#![cfg_attr(not(feature = "rbac"), doc = "```rust,ignore")]
+//! use authrs::rbac::{Permission, Role, RoleBuilder, RoleManager, PolicyEngine, Policy, Subject, Resource, Action};
+//!
+//! // 创建角色管理器
+//! let mut manager = RoleManager::new();
+//!
+//! // 创建角色
+//! let viewer = RoleBuilder::new("viewer")
+//!     .permission(Permission::new("posts", "read"))
+//!     .build();
+//!
+//! let editor = RoleBuilder::new("editor")
+//!     .inherit("viewer")
+//!     .permission(Permission::new("posts", "write"))
+//!     .build();
+//!
+//! manager.add_role(viewer);
+//! manager.add_role(editor);
+//!
+//! // 检查权限
+//! assert!(manager.role_has_permission("editor", &Permission::new("posts", "read")));
+//! assert!(manager.role_has_permission("editor", &Permission::new("posts", "write")));
+//!
+//! // 使用策略引擎
+//! let mut engine = PolicyEngine::new();
+//! engine.add_policy(
+//!     Policy::allow("editor-posts")
+//!         .role("editor")
+//!         .resource("posts")
+//!         .actions(["read", "write"])
+//!         .build()
+//! );
+//!
+//! let user = Subject::new("user1").with_role("editor");
+//! assert!(engine.check_permission(&user, "posts", "read"));
+//! ```
 
 pub mod api_key;
 pub mod error;
 pub mod mfa;
+#[cfg(feature = "oauth")]
 pub mod oauth;
 pub mod password;
 pub mod random;
+#[cfg(feature = "rbac")]
+pub mod rbac;
 pub mod security;
 pub mod token;
 #[cfg(feature = "webauthn")]
@@ -265,6 +312,7 @@ pub use security::rate_limit::{RateLimitConfig, RateLimitInfo, RateLimiter};
 // OAuth 2.0 相关导出
 // ============================================================================
 
+#[cfg(feature = "oauth")]
 pub use oauth::{
     // Token
     AccessToken,
@@ -343,4 +391,32 @@ pub use webauthn::{
     WebAuthnServiceError,
     Webauthn,
     WebauthnBuilder,
+};
+
+// ============================================================================
+// RBAC 相关导出
+// ============================================================================
+
+#[cfg(feature = "rbac")]
+pub use rbac::{
+    // 权限
+    Action,
+    // 策略
+    Decision,
+    DecisionReason,
+    // 角色
+    InMemoryRoleStore,
+    Permission,
+    PermissionSet,
+    Policy,
+    PolicyBuilder,
+    PolicyEffect,
+    PolicyEngine,
+    PolicyEvaluator,
+    Resource,
+    Role,
+    RoleBuilder,
+    RoleManager,
+    RoleStore,
+    Subject,
 };
