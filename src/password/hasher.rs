@@ -3,10 +3,13 @@
 //! 提供密码哈希和验证的核心功能。
 
 #[cfg(feature = "argon2")]
-use argon2::{
-    Argon2, PasswordHash, PasswordVerifier,
-    password_hash::{PasswordHasher as Argon2Hasher, SaltString},
-};
+use argon2::Argon2;
+
+#[cfg(any(feature = "argon2", feature = "scrypt"))]
+use password_hash::{PasswordHash, PasswordHasher as _, PasswordVerifier as _, SaltString};
+
+#[cfg(feature = "scrypt")]
+use scrypt::{Params as ScryptParams, Scrypt};
 
 use crate::error::{Error, PasswordHashError, Result};
 
@@ -21,12 +24,16 @@ pub enum Algorithm {
     /// bcrypt - 经典算法，广泛支持
     #[cfg(feature = "bcrypt")]
     Bcrypt,
+
+    /// scrypt - 适用于受限计算资源、抵抗 GPU 攻击
+    #[cfg(feature = "scrypt")]
+    Scrypt,
 }
 
 // 编译时检查：至少需要启用一个密码哈希算法
-#[cfg(not(any(feature = "argon2", feature = "bcrypt")))]
+#[cfg(not(any(feature = "argon2", feature = "bcrypt", feature = "scrypt")))]
 compile_error!(
-    "At least one password hashing algorithm (argon2 or bcrypt) must be enabled. Enable either 'argon2' or 'bcrypt' feature."
+    "At least one password hashing algorithm (argon2, bcrypt, or scrypt) must be enabled. Enable one of the password hashing features."
 );
 
 #[allow(clippy::derivable_impls)]
@@ -40,6 +47,13 @@ impl Default for Algorithm {
         {
             Algorithm::Bcrypt
         }
+        #[cfg(all(
+            not(any(feature = "argon2", feature = "bcrypt")),
+            feature = "scrypt"
+        ))]
+        {
+            Algorithm::Scrypt
+        }
     }
 }
 
@@ -52,6 +66,10 @@ pub struct PasswordHasher {
     /// bcrypt 的 cost 参数 (4-31, 默认 12)
     #[cfg(feature = "bcrypt")]
     bcrypt_cost: u32,
+
+    /// scrypt 参数（N, r, p）
+    #[cfg(feature = "scrypt")]
+    scrypt_params: ScryptParams,
 }
 
 impl Default for PasswordHasher {
@@ -60,6 +78,8 @@ impl Default for PasswordHasher {
             algorithm: Algorithm::default(),
             #[cfg(feature = "bcrypt")]
             bcrypt_cost: 12,
+            #[cfg(feature = "scrypt")]
+            scrypt_params: ScryptParams::recommended(),
         }
     }
 }
@@ -84,6 +104,8 @@ impl PasswordHasher {
             algorithm,
             #[cfg(feature = "bcrypt")]
             bcrypt_cost: 12,
+            #[cfg(feature = "scrypt")]
+            scrypt_params: ScryptParams::recommended(),
         }
     }
 
@@ -103,6 +125,13 @@ impl PasswordHasher {
             "bcrypt cost must be between 4 and 31"
         );
         self.bcrypt_cost = cost;
+        self
+    }
+
+    /// 设置 scrypt 参数（log_n、r、p、输出长度）
+    #[cfg(feature = "scrypt")]
+    pub fn with_scrypt_params(mut self, params: ScryptParams) -> Self {
+        self.scrypt_params = params;
         self
     }
 
@@ -132,6 +161,8 @@ impl PasswordHasher {
             Algorithm::Argon2id => self.hash_argon2(password),
             #[cfg(feature = "bcrypt")]
             Algorithm::Bcrypt => self.hash_bcrypt(password),
+            #[cfg(feature = "scrypt")]
+            Algorithm::Scrypt => self.hash_scrypt(password),
         }
     }
 
@@ -167,6 +198,10 @@ impl PasswordHasher {
         if hash.starts_with("$2") {
             return self.verify_bcrypt(password, hash);
         }
+        #[cfg(feature = "scrypt")]
+        if hash.starts_with("$scrypt$") {
+            return self.verify_scrypt(password, hash);
+        }
         Err(Error::PasswordHash(PasswordHashError::InvalidFormat(
             "unknown hash format".to_string(),
         )))
@@ -200,6 +235,8 @@ impl PasswordHasher {
                 }
                 true
             }
+            #[cfg(feature = "scrypt")]
+            Algorithm::Scrypt => !hash.starts_with("$scrypt$"),
         }
     }
 
@@ -274,6 +311,57 @@ impl PasswordHasher {
             )))
         })
     }
+
+    // ========================================================================
+    // scrypt 实现
+    // ========================================================================
+
+    #[cfg(feature = "scrypt")]
+    fn hash_scrypt(&self, password: &str) -> Result<String> {
+        let mut salt_bytes = [0u8; 16];
+        getrandom::fill(&mut salt_bytes).map_err(|e| {
+            Error::PasswordHash(PasswordHashError::HashFailed(format!(
+                "Failed to generate random salt: {}",
+                e
+            )))
+        })?;
+        let salt = SaltString::encode_b64(&salt_bytes).map_err(|e| {
+            Error::PasswordHash(PasswordHashError::HashFailed(format!(
+                "Failed to encode salt: {}",
+                e
+            )))
+        })?;
+
+        Scrypt
+            .hash_password_customized(
+                password.as_bytes(),
+                None,
+                None,
+                self.scrypt_params,
+                &salt,
+            )
+            .map(|h| h.to_string())
+            .map_err(|e| {
+                Error::PasswordHash(PasswordHashError::HashFailed(format!(
+                    "scrypt hash failed: {}",
+                    e
+                )))
+            })
+    }
+
+    #[cfg(feature = "scrypt")]
+    fn verify_scrypt(&self, password: &str, hash: &str) -> Result<bool> {
+        let parsed_hash = PasswordHash::new(hash).map_err(|e| {
+            Error::PasswordHash(PasswordHashError::InvalidFormat(format!(
+                "invalid scrypt hash: {}",
+                e
+            )))
+        })?;
+
+        Ok(Scrypt
+            .verify_password(password.as_bytes(), &parsed_hash)
+            .is_ok())
+    }
 }
 
 // ============================================================================
@@ -282,7 +370,7 @@ impl PasswordHasher {
 
 /// 使用默认算法哈希密码
 ///
-/// 默认使用 Argon2id（如果启用），否则使用 bcrypt
+/// 默认使用 Argon2id（如果启用），否则回退到 bcrypt，再否则使用 scrypt
 ///
 /// # Arguments
 ///
@@ -306,7 +394,7 @@ pub fn hash_password(password: &str) -> Result<String> {
 
 /// 验证密码是否匹配哈希
 ///
-/// 自动检测哈希格式（支持 Argon2 和 bcrypt，取决于启用的 feature）
+/// 自动检测哈希格式（支持 Argon2 / bcrypt / scrypt，取决于启用的 feature）
 ///
 /// # Arguments
 ///
@@ -362,6 +450,19 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "scrypt")]
+    fn test_scrypt_hash_and_verify() {
+        let hasher = PasswordHasher::new(Algorithm::Scrypt);
+        let password = "test_password_123";
+
+        let hash = hasher.hash(password).unwrap();
+        assert!(hash.starts_with("$scrypt$"));
+
+        assert!(hasher.verify(password, &hash).unwrap());
+        assert!(!hasher.verify("wrong_password", &hash).unwrap());
+    }
+
+    #[test]
     fn test_convenience_functions() {
         let password = "my_secure_password";
 
@@ -393,6 +494,14 @@ mod tests {
             let bcrypt_hash = bcrypt_hasher.hash("test").unwrap();
             assert!(hasher.verify("test", &bcrypt_hash).unwrap());
         }
+
+        #[cfg(feature = "scrypt")]
+        {
+            // 测试 scrypt 哈希
+            let scrypt_hasher = PasswordHasher::new(Algorithm::Scrypt);
+            let scrypt_hash = scrypt_hasher.hash("test").unwrap();
+            assert!(hasher.verify("test", &scrypt_hash).unwrap());
+        }
     }
 
     #[test]
@@ -414,6 +523,15 @@ mod tests {
         let low_cost_hasher = PasswordHasher::new(Algorithm::Bcrypt).with_bcrypt_cost(4);
         let low_cost_hash = low_cost_hasher.hash("test").unwrap();
         assert!(bcrypt_hasher.needs_rehash(&low_cost_hash));
+    }
+
+    #[test]
+    #[cfg(feature = "scrypt")]
+    fn test_needs_rehash_scrypt() {
+        let hasher = PasswordHasher::new(Algorithm::Scrypt);
+        let hash = hasher.hash("test").unwrap();
+        assert!(!hasher.needs_rehash(&hash));
+        assert!(hasher.needs_rehash("$argon2id$dummy"));
     }
 
     #[test]

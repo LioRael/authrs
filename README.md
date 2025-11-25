@@ -6,7 +6,7 @@
 AuthRS is a Rust 2024 authentication toolkit that consolidates password hashing, JWT/session tokens, MFA, passwordless (Magic Link / OTP), CSRF, rate limiting, and secure randomness utilities so you can assemble robust auth flows without re-implementing primitives.
 
 ## Features
-- Password hashing and strength validation (Argon2, bcrypt, policy helpers)
+- Password hashing and strength validation (Argon2, bcrypt, scrypt, policy helpers)
 - Secure random generators and constant-time comparison helpers
 - JWT creation/validation plus refresh/session token management
 - MFA (TOTP/HOTP) with recovery codes and otpauth helpers
@@ -14,7 +14,7 @@ AuthRS is a Rust 2024 authentication toolkit that consolidates password hashing,
 - Passwordless (Magic Link / OTP) flows with in-memory stores
 - HKDF-based crypto helpers (SHA-256/SHA-512)
 - CSRF protection and adaptive rate limiting
-- Cargo feature flags to tailor footprint (`argon2`, `bcrypt`, `jwt`, `mfa`, `api-key`, `passwordless`, `crypto`, `oauth`, `rbac`, `webauthn`, `full`)
+- Cargo feature flags to tailor footprint (`argon2`, `bcrypt`, `scrypt`, `jwt`, `mfa`, `api-key`, `passwordless`, `crypto`, `oauth`, `rbac`, `webauthn`, `full`)
 
 ## Project Structure
 ```
@@ -57,9 +57,9 @@ println!("subject={}", claims.sub.unwrap_or_default());
 
 ## Feature Flags
 - Defaults: `argon2`, `jwt`, `mfa`
-- Optional: `bcrypt`, `oauth`, `rbac`, `webauthn`, `passwordless`, `crypto`, `api-key`
+- Optional: `bcrypt`, `scrypt`, `oauth`, `rbac`, `webauthn`, `passwordless`, `crypto`, `api-key`
 - `full` turns on every optional module
-- Combine selectively via `cargo build --no-default-features --features jwt,api-key`
+- Combine selectively via `cargo build --no-default-features --features jwt,scrypt`
 
 ## Development Workflow
 ```bash

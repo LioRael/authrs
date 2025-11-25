@@ -6,7 +6,7 @@
 AuthRS 是一个基于 Rust 2024 的认证工具包，整合了密码哈希、JWT/Session、MFA、Passwordless（魔法链接/OTP）、CSRF、速率限制以及安全随机工具，帮助你快速构建可靠且安全的认证流程。
 
 ## 功能特性
-- 密码哈希与强度校验（Argon2、bcrypt、自定义策略）
+- 密码哈希与强度校验（Argon2、bcrypt、scrypt、自定义策略）
 - 安全随机生成器与常量时间比较函数
 - JWT 生成/验证、Refresh Token 与 Session 管理
 - 支持 TOTP/HOTP 的多因素认证与恢复码
@@ -14,7 +14,7 @@ AuthRS 是一个基于 Rust 2024 的认证工具包，整合了密码哈希、JW
 - Passwordless（魔法链接/OTP）流程与内存存储实现
 - 基于 HKDF 的密码学辅助函数（SHA-256/SHA-512）
 - CSRF 防护与自适应速率限制
-- 通过 Cargo Feature 精准裁剪（`argon2`、`bcrypt`、`jwt`、`mfa`、`api-key`、`passwordless`、`crypto`、`oauth`、`rbac`、`webauthn`、`full`）
+- 通过 Cargo Feature 精准裁剪（`argon2`、`bcrypt`、`scrypt`、`jwt`、`mfa`、`api-key`、`passwordless`、`crypto`、`oauth`、`rbac`、`webauthn`、`full`）
 
 ## 项目结构
 ```
@@ -57,9 +57,9 @@ println!("subject={}", claims.sub.unwrap_or_default());
 
 ## 功能开关
 - 默认启用：`argon2`、`jwt`、`mfa`
-- 可选：`bcrypt`、`oauth`、`rbac`、`webauthn`、`passwordless`、`crypto`、`api-key`
+- 可选：`bcrypt`、`scrypt`、`oauth`、`rbac`、`webauthn`、`passwordless`、`crypto`、`api-key`
 - `full` 打开全部可选模块
-- 通过 `cargo build --no-default-features --features jwt,api-key` 仅编译所需模块
+- 通过 `cargo build --no-default-features --features jwt,scrypt` 仅编译所需模块
 
 ## 开发流程
 ```bash

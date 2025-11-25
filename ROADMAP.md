@@ -227,14 +227,14 @@ pub struct NoOpAuditLogger { ... }   // ✅ 空操作实现
 - [x] 便捷构造方法
 - [x] 事件序列化
 
-#### 10. scrypt 密码哈希
+#### 10. ~~scrypt 密码哈希~~ ✅ 已完成
 
 在 `password/hasher.rs` 中增加 scrypt 支持作为另一个算法选项。
 
 **功能点：**
-- [ ] scrypt 哈希
-- [ ] scrypt 验证
-- [ ] 可配置参数
+- [x] scrypt 哈希
+- [x] scrypt 验证
+- [x] 可配置参数
 
 ---
 

@@ -19,6 +19,7 @@ default = ["argon2", "jwt", "mfa"]
 # 密码哈希算法
 argon2 = ["dep:argon2"]
 bcrypt = ["dep:bcrypt"]
+scrypt = ["dep:scrypt"]
 
 # JWT 支持
 jwt = ["dep:jsonwebtoken"]
@@ -48,6 +49,7 @@ api-key = []
 full = [
     "argon2",
     "bcrypt",
+    "scrypt",
     "jwt",
     "mfa",
     "oauth",
@@ -62,6 +64,7 @@ full = [
 # 密码哈希 (可选)
 argon2 = { version = "0.6.0-rc.2", optional = true }
 bcrypt = { version = "0.17", optional = true }
+scrypt = { version = "0.11", optional = true }
 
 # JWT (可选) - 使用 rust_crypto 后端和 PEM 支持
 jsonwebtoken = { version = "10", optional = true, default-features = false, features = [
@@ -95,6 +98,9 @@ urlencoding = "2.1"
 
 # 常量时间比较（防止时序攻击）
 subtle = "2.6"
+
+# PHC string support for password hashers
+password-hash = "0.5"
 
 # HMAC 和 SHA2 (用于 CSRF, security, 以及 MFA 的 SHA256/SHA512)
 hmac = "0.12"
