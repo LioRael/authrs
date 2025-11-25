@@ -2,6 +2,7 @@
 //!
 //! 提供 OAuth 客户端的创建、验证和管理功能。
 
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -309,18 +310,19 @@ impl OAuthClient {
 }
 
 /// OAuth 客户端存储 trait
+#[async_trait]
 pub trait OAuthClientStore: Send + Sync {
     /// 保存客户端
-    fn save(&mut self, client: &OAuthClient) -> Result<()>;
+    async fn save(&mut self, client: &OAuthClient) -> Result<()>;
 
     /// 根据 client_id 查找客户端
-    fn find_by_id(&self, client_id: &str) -> Result<Option<OAuthClient>>;
+    async fn find_by_id(&self, client_id: &str) -> Result<Option<OAuthClient>>;
 
     /// 删除客户端
-    fn delete(&mut self, client_id: &str) -> Result<()>;
+    async fn delete(&mut self, client_id: &str) -> Result<()>;
 
     /// 列出所有客户端
-    fn list(&self) -> Result<Vec<OAuthClient>>;
+    async fn list(&self) -> Result<Vec<OAuthClient>>;
 }
 
 /// 内存客户端存储实现
@@ -336,25 +338,26 @@ impl InMemoryClientStore {
     }
 }
 
+#[async_trait]
 impl OAuthClientStore for InMemoryClientStore {
-    fn save(&mut self, client: &OAuthClient) -> Result<()> {
+    async fn save(&mut self, client: &OAuthClient) -> Result<()> {
         self.clients
             .insert(client.client_id.clone(), client.clone());
         Ok(())
     }
 
-    fn find_by_id(&self, client_id: &str) -> Result<Option<OAuthClient>> {
+    async fn find_by_id(&self, client_id: &str) -> Result<Option<OAuthClient>> {
         Ok(self.clients.get(client_id).cloned())
     }
 
-    fn delete(&mut self, client_id: &str) -> Result<()> {
+    async fn delete(&mut self, client_id: &str) -> Result<()> {
         self.clients
             .remove(client_id)
             .ok_or_else(|| Error::Storage(StorageError::NotFound(client_id.to_string())))?;
         Ok(())
     }
 
-    fn list(&self) -> Result<Vec<OAuthClient>> {
+    async fn list(&self) -> Result<Vec<OAuthClient>> {
         Ok(self.clients.values().cloned().collect())
     }
 }

@@ -8,10 +8,11 @@ use authrs::oauth::{
     ClientType, GrantType, InMemoryClientStore, IntrospectionRequest, IntrospectionResponse,
     OAuthClient, OAuthClientStore, PkceChallenge, PkceMethod, TokenResponse,
 };
+use tokio;
 
 /// 测试 OAuth 客户端创建和验证
-#[test]
-fn test_oauth_client_creation() {
+#[tokio::test]
+async fn test_oauth_client_creation() {
     // 创建机密客户端（带密钥）
     let (client, secret) = OAuthClient::builder()
         .name("My Web Application")
@@ -57,8 +58,8 @@ fn test_oauth_client_creation() {
 }
 
 /// 测试公开客户端（无密钥）
-#[test]
-fn test_public_client() {
+#[tokio::test]
+async fn test_public_client() {
     let (client, secret) = OAuthClient::builder()
         .name("Mobile App")
         .client_type(ClientType::Public)
@@ -73,8 +74,8 @@ fn test_public_client() {
 }
 
 /// 测试 PKCE (S256 方法)
-#[test]
-fn test_pkce_s256() {
+#[tokio::test]
+async fn test_pkce_s256() {
     // 生成 PKCE challenge
     let challenge = PkceChallenge::new(PkceMethod::S256).expect("PKCE generation should succeed");
 
@@ -105,8 +106,8 @@ fn test_pkce_s256() {
 }
 
 /// 测试 PKCE (Plain 方法)
-#[test]
-fn test_pkce_plain() {
+#[tokio::test]
+async fn test_pkce_plain() {
     let challenge =
         PkceChallenge::new(PkceMethod::Plain).expect("PKCE Plain generation should succeed");
 
@@ -123,8 +124,8 @@ fn test_pkce_plain() {
 }
 
 /// 测试 Token 响应构建
-#[test]
-fn test_token_response() {
+#[tokio::test]
+async fn test_token_response() {
     let response = TokenResponse::new("access_token_here_abc123")
         .with_expires_in(3600)
         .with_refresh_token("refresh_token_here_xyz789")
@@ -141,8 +142,8 @@ fn test_token_response() {
 }
 
 /// 测试 Token 内省请求
-#[test]
-fn test_introspection_request() {
+#[tokio::test]
+async fn test_introspection_request() {
     // 创建内省请求
     let request = IntrospectionRequest::new("token_to_check_123");
 
@@ -157,8 +158,8 @@ fn test_introspection_request() {
 }
 
 /// 测试 Token 内省响应
-#[test]
-fn test_introspection_response() {
+#[tokio::test]
+async fn test_introspection_response() {
     // 活跃 token 响应
     let active_response = IntrospectionResponse::active()
         .scope("read write")
@@ -186,8 +187,8 @@ fn test_introspection_response() {
 }
 
 /// 测试 OAuth 客户端存储
-#[test]
-fn test_client_store() {
+#[tokio::test]
+async fn test_client_store() {
     let mut store = InMemoryClientStore::new();
 
     // 创建并存储客户端
@@ -201,7 +202,7 @@ fn test_client_store() {
         .unwrap();
 
     let client1_id = client1.client_id.clone();
-    let _ = store.save(&client1);
+    let _ = store.save(&client1).await;
 
     let (client2, _) = OAuthClient::builder()
         .name("Client 2")
@@ -213,35 +214,35 @@ fn test_client_store() {
         .unwrap();
 
     let client2_id = client2.client_id.clone();
-    let _ = store.save(&client2);
+    let _ = store.save(&client2).await;
 
     // 通过 ID 获取
-    let retrieved1 = store.find_by_id(&client1_id).unwrap();
+    let retrieved1 = store.find_by_id(&client1_id).await.unwrap();
     assert!(retrieved1.is_some());
     assert_eq!(retrieved1.unwrap().name, "Client 1");
 
-    let retrieved2 = store.find_by_id(&client2_id).unwrap();
+    let retrieved2 = store.find_by_id(&client2_id).await.unwrap();
     assert!(retrieved2.is_some());
     assert_eq!(retrieved2.unwrap().name, "Client 2");
 
     // 不存在的 ID
-    let not_found = store.find_by_id("nonexistent_id").unwrap();
+    let not_found = store.find_by_id("nonexistent_id").await.unwrap();
     assert!(not_found.is_none());
 
     // 列出所有客户端
-    let all_clients = store.list().unwrap();
+    let all_clients = store.list().await.unwrap();
     assert_eq!(all_clients.len(), 2);
 
     // 删除客户端
-    let deleted = store.delete(&client1_id);
+    let deleted = store.delete(&client1_id).await;
     assert!(deleted.is_ok());
-    assert!(store.find_by_id(&client1_id).unwrap().is_none());
-    assert_eq!(store.list().unwrap().len(), 1);
+    assert!(store.find_by_id(&client1_id).await.unwrap().is_none());
+    assert_eq!(store.list().await.unwrap().len(), 1);
 }
 
 /// 测试重定向 URI 验证
-#[test]
-fn test_redirect_uri_validation() {
+#[tokio::test]
+async fn test_redirect_uri_validation() {
     let (client, _) = OAuthClient::builder()
         .name("URI Test Client")
         .client_type(ClientType::Confidential)
@@ -262,8 +263,8 @@ fn test_redirect_uri_validation() {
 }
 
 /// 测试授权类型验证
-#[test]
-fn test_grant_type_validation() {
+#[tokio::test]
+async fn test_grant_type_validation() {
     let (client, _) = OAuthClient::builder()
         .name("Grant Test Client")
         .client_type(ClientType::Confidential)
@@ -283,8 +284,8 @@ fn test_grant_type_validation() {
 }
 
 /// 测试完整的 OAuth 授权码流程（模拟）
-#[test]
-fn test_authorization_code_flow_simulation() {
+#[tokio::test]
+async fn test_authorization_code_flow_simulation() {
     // === 步骤 1：客户端注册 ===
     let mut client_store = InMemoryClientStore::new();
 
@@ -301,7 +302,7 @@ fn test_authorization_code_flow_simulation() {
 
     let client_id = client.client_id.clone();
     let secret = client_secret.unwrap();
-    let _ = client_store.save(&client);
+    let _ = client_store.save(&client).await;
 
     // === 步骤 2：生成 PKCE ===
     let pkce = PkceChallenge::new(PkceMethod::S256).unwrap();
@@ -311,6 +312,7 @@ fn test_authorization_code_flow_simulation() {
     // === 步骤 3：模拟授权请求验证 ===
     let client = client_store
         .find_by_id(&client_id)
+        .await
         .unwrap()
         .expect("Client should exist");
 
@@ -332,6 +334,7 @@ fn test_authorization_code_flow_simulation() {
     // 验证客户端凭证 - 需要重新获取 client 因为之前的被借用了
     let client_for_verify = client_store
         .find_by_id(&client_id)
+        .await
         .unwrap()
         .expect("Client should exist");
     assert!(client_for_verify.verify_secret(&secret));
@@ -364,8 +367,8 @@ fn test_authorization_code_flow_simulation() {
 }
 
 /// 测试客户端凭证授权流程
-#[test]
-fn test_client_credentials_flow() {
+#[tokio::test]
+async fn test_client_credentials_flow() {
     let (client, client_secret) = OAuthClient::builder()
         .name("Service Client")
         .client_type(ClientType::Confidential)
@@ -396,8 +399,8 @@ fn test_client_credentials_flow() {
 }
 
 /// 测试多个 PKCE challenge 的独立性
-#[test]
-fn test_pkce_independence() {
+#[tokio::test]
+async fn test_pkce_independence() {
     let challenge1 = PkceChallenge::new(PkceMethod::S256).unwrap();
     let challenge2 = PkceChallenge::new(PkceMethod::S256).unwrap();
 
