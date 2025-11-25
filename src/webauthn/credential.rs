@@ -3,7 +3,9 @@
 //! 提供凭证存储、查询和管理的功能。
 
 use std::collections::HashMap;
+use std::sync::RwLock;
 
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use webauthn_rs::prelude::*;
@@ -110,19 +112,21 @@ impl StoredCredential {
 /// 凭证存储 Trait
 ///
 /// 实现此 trait 以提供自定义的凭证存储后端（如数据库）
-pub trait CredentialStore {
+#[async_trait]
+pub trait CredentialStore: Send + Sync {
     /// 保存凭证
-    fn save(&mut self, credential: StoredCredential) -> Result<(), CredentialStoreError>;
+    async fn save(&self, credential: StoredCredential) -> Result<(), CredentialStoreError>;
 
     /// 根据凭证 ID 查找凭证
-    fn find_by_id(&self, credential_id: &str) -> Option<StoredCredential>;
+    async fn find_by_id(&self, credential_id: &str) -> Option<StoredCredential>;
 
     /// 根据用户 ID 查找所有凭证
-    fn find_by_user(&self, user_id: &str) -> Vec<StoredCredential>;
+    async fn find_by_user(&self, user_id: &str) -> Vec<StoredCredential>;
 
     /// 根据用户 ID 获取所有 Passkey（用于认证）
-    fn get_passkeys_for_user(&self, user_id: &str) -> Vec<Passkey> {
+    async fn get_passkeys_for_user(&self, user_id: &str) -> Vec<Passkey> {
         self.find_by_user(user_id)
+            .await
             .into_iter()
             .filter(|c| c.is_valid())
             .map(|c| c.passkey)
@@ -130,20 +134,20 @@ pub trait CredentialStore {
     }
 
     /// 更新凭证
-    fn update(&mut self, credential: StoredCredential) -> Result<(), CredentialStoreError>;
+    async fn update(&self, credential: StoredCredential) -> Result<(), CredentialStoreError>;
 
     /// 删除凭证
-    fn delete(&mut self, credential_id: &str) -> Result<bool, CredentialStoreError>;
+    async fn delete(&self, credential_id: &str) -> Result<bool, CredentialStoreError>;
 
     /// 根据用户 ID 删除所有凭证
-    fn delete_by_user(&mut self, user_id: &str) -> Result<usize, CredentialStoreError>;
+    async fn delete_by_user(&self, user_id: &str) -> Result<usize, CredentialStoreError>;
 
     /// 列出所有凭证
-    fn list(&self) -> Vec<StoredCredential>;
+    async fn list(&self) -> Vec<StoredCredential>;
 
     /// 统计用户凭证数量
-    fn count_by_user(&self, user_id: &str) -> usize {
-        self.find_by_user(user_id).len()
+    async fn count_by_user(&self, user_id: &str) -> usize {
+        self.find_by_user(user_id).await.len()
     }
 }
 
@@ -179,7 +183,7 @@ impl std::error::Error for CredentialStoreError {}
 /// 适用于测试和开发环境
 #[derive(Debug, Default)]
 pub struct InMemoryCredentialStore {
-    credentials: HashMap<String, StoredCredential>,
+    credentials: RwLock<HashMap<String, StoredCredential>>,
 }
 
 impl InMemoryCredentialStore {
@@ -189,57 +193,89 @@ impl InMemoryCredentialStore {
     }
 }
 
+#[async_trait]
 impl CredentialStore for InMemoryCredentialStore {
-    fn save(&mut self, credential: StoredCredential) -> Result<(), CredentialStoreError> {
-        if self.credentials.contains_key(&credential.credential_id) {
+    async fn save(&self, credential: StoredCredential) -> Result<(), CredentialStoreError> {
+        let mut credentials = self
+            .credentials
+            .write()
+            .map_err(|e| CredentialStoreError::StorageError(e.to_string()))?;
+
+        if credentials.contains_key(&credential.credential_id) {
             return Err(CredentialStoreError::AlreadyExists);
         }
-        self.credentials
-            .insert(credential.credential_id.clone(), credential);
+
+        credentials.insert(credential.credential_id.clone(), credential);
         Ok(())
     }
 
-    fn find_by_id(&self, credential_id: &str) -> Option<StoredCredential> {
-        self.credentials.get(credential_id).cloned()
-    }
-
-    fn find_by_user(&self, user_id: &str) -> Vec<StoredCredential> {
+    async fn find_by_id(&self, credential_id: &str) -> Option<StoredCredential> {
         self.credentials
-            .values()
-            .filter(|c| c.user_id == user_id)
-            .cloned()
-            .collect()
+            .read()
+            .ok()
+            .and_then(|creds| creds.get(credential_id).cloned())
     }
 
-    fn update(&mut self, credential: StoredCredential) -> Result<(), CredentialStoreError> {
-        if !self.credentials.contains_key(&credential.credential_id) {
+    async fn find_by_user(&self, user_id: &str) -> Vec<StoredCredential> {
+        self.credentials
+            .read()
+            .map(|creds| {
+                creds
+                    .values()
+                    .filter(|c| c.user_id == user_id)
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    async fn update(&self, credential: StoredCredential) -> Result<(), CredentialStoreError> {
+        let mut credentials = self
+            .credentials
+            .write()
+            .map_err(|e| CredentialStoreError::StorageError(e.to_string()))?;
+
+        if !credentials.contains_key(&credential.credential_id) {
             return Err(CredentialStoreError::NotFound);
         }
-        self.credentials
-            .insert(credential.credential_id.clone(), credential);
+
+        credentials.insert(credential.credential_id.clone(), credential);
         Ok(())
     }
 
-    fn delete(&mut self, credential_id: &str) -> Result<bool, CredentialStoreError> {
-        Ok(self.credentials.remove(credential_id).is_some())
+    async fn delete(&self, credential_id: &str) -> Result<bool, CredentialStoreError> {
+        let mut credentials = self
+            .credentials
+            .write()
+            .map_err(|e| CredentialStoreError::StorageError(e.to_string()))?;
+        Ok(credentials.remove(credential_id).is_some())
     }
 
-    fn delete_by_user(&mut self, user_id: &str) -> Result<usize, CredentialStoreError> {
-        let to_remove: Vec<_> = self
+    async fn delete_by_user(&self, user_id: &str) -> Result<usize, CredentialStoreError> {
+        let mut credentials = self
             .credentials
+            .write()
+            .map_err(|e| CredentialStoreError::StorageError(e.to_string()))?;
+
+        let to_remove: Vec<_> = credentials
             .iter()
             .filter(|(_, c)| c.user_id == user_id)
             .map(|(k, _)| k.clone())
             .collect();
+
         let count = to_remove.len();
         for key in to_remove {
-            self.credentials.remove(&key);
+            credentials.remove(&key);
         }
+
         Ok(count)
     }
 
-    fn list(&self) -> Vec<StoredCredential> {
-        self.credentials.values().cloned().collect()
+    async fn list(&self) -> Vec<StoredCredential> {
+        self.credentials
+            .read()
+            .map(|creds| creds.values().cloned().collect())
+            .unwrap_or_default()
     }
 }
 
@@ -286,9 +322,9 @@ mod tests {
         assert!(!encoded.contains('='));
     }
 
-    #[test]
-    fn test_in_memory_store_basic() {
+    #[tokio::test]
+    async fn test_in_memory_store_basic() {
         let store = InMemoryCredentialStore::new();
-        assert!(store.list().is_empty());
+        assert!(store.list().await.is_empty());
     }
 }

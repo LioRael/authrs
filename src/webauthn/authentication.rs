@@ -233,13 +233,13 @@ impl<'a> AuthenticationManager<'a> {
     /// 使用存储开始认证
     ///
     /// 便捷方法，自动从存储中获取用户凭证
-    pub fn start_authentication_with_store<S: CredentialStore>(
+    pub async fn start_authentication_with_store<S: CredentialStore>(
         &self,
         user_id: impl Into<String>,
         store: &S,
     ) -> Result<(RequestChallengeResponse, AuthenticationState), AuthenticationError> {
         let user_id = user_id.into();
-        let credentials = store.get_passkeys_for_user(&user_id);
+        let credentials = store.get_passkeys_for_user(&user_id).await;
 
         if credentials.is_empty() {
             return Err(AuthenticationError::NoCredentials);
@@ -251,11 +251,11 @@ impl<'a> AuthenticationManager<'a> {
     /// 完成认证并更新凭证
     ///
     /// 便捷方法，自动更新存储中的凭证
-    pub fn finish_authentication_and_update<S: CredentialStore>(
+    pub async fn finish_authentication_and_update<S: CredentialStore>(
         &self,
         state: &AuthenticationState,
         response: &PublicKeyCredential,
-        store: &mut S,
+        store: &S,
     ) -> Result<WebAuthnAuthenticationResult, AuthenticationError> {
         // 获取用户凭证
         let user_id = state
@@ -263,21 +263,22 @@ impl<'a> AuthenticationManager<'a> {
             .as_ref()
             .ok_or(AuthenticationError::MissingUserId)?;
 
-        let credentials = store.get_passkeys_for_user(user_id);
+        let credentials = store.get_passkeys_for_user(user_id).await;
 
         // 完成认证
         let (result, updated_passkey) =
             self.finish_authentication(state, response, &credentials)?;
 
         // 更新凭证（如果有变化）
-        if let Some(passkey) = updated_passkey
-            && let Some(mut stored) = store.find_by_id(&result.credential_id)
-        {
-            stored.update_passkey(passkey);
-            stored.record_use();
-            store
-                .update(stored)
-                .map_err(|e| AuthenticationError::StorageError(e.to_string()))?;
+        if let Some(passkey) = updated_passkey {
+            if let Some(mut stored) = store.find_by_id(&result.credential_id).await {
+                stored.update_passkey(passkey);
+                stored.record_use();
+                store
+                    .update(stored)
+                    .await
+                    .map_err(|e| AuthenticationError::StorageError(e.to_string()))?;
+            }
         }
 
         Ok(result)

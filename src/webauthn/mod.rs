@@ -28,7 +28,7 @@
 //! ```rust,ignore
 //! use authrs::webauthn::{WebAuthnService, RegistrationManager};
 //!
-//! // 1. 开始注册
+//! // 在 async 环境中执行
 //! let reg_manager = RegistrationManager::new(webauthn.webauthn());
 //! let (challenge, state) = reg_manager.start_registration(
 //!     "user123",               // 用户 ID
@@ -45,7 +45,7 @@
 //! let credential = reg_manager.finish_registration(&state, &response)?;
 //!
 //! // 5. 保存凭证到存储
-//! store.save(credential)?;
+//! store.save(credential).await?;
 //! ```
 //!
 //! ### 认证流程
@@ -54,13 +54,13 @@
 //! use authrs::webauthn::{WebAuthnService, AuthenticationManager};
 //!
 //! // 1. 获取用户凭证
-//! let credentials = store.get_passkeys_for_user("user123");
+//! let credentials = store.get_passkeys_for_user("user123").await;
 //!
 //! // 2. 开始认证
 //! let auth_manager = AuthenticationManager::new(webauthn.webauthn());
 //! let (challenge, state) = auth_manager.start_authentication(
 //!     Some("user123".to_string()),
-//!     credentials,
+//!     credentials.clone(),
 //! )?;
 //!
 //! // 3. 将 challenge 发送给客户端...
@@ -78,12 +78,14 @@
 //! 生产环境请实现 `CredentialStore` trait 对接数据库。
 //!
 //! ```rust,ignore
+//! use async_trait::async_trait;
 //! use authrs::webauthn::{CredentialStore, StoredCredential, CredentialStoreError};
 //!
 //! struct MyDatabaseStore { /* ... */ }
 //!
+//! #[async_trait]
 //! impl CredentialStore for MyDatabaseStore {
-//!     fn save(&mut self, credential: StoredCredential) -> Result<(), CredentialStoreError> {
+//!     async fn save(&self, credential: StoredCredential) -> Result<(), CredentialStoreError> {
 //!         // 保存到数据库...
 //!         Ok(())
 //!     }

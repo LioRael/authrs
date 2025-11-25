@@ -259,7 +259,7 @@ impl<'a> RegistrationManager<'a> {
     /// 开始注册并自动排除已有凭证
     ///
     /// 便捷方法，自动从存储中获取用户已有凭证
-    pub fn start_registration_with_store<S: CredentialStore>(
+    pub async fn start_registration_with_store<S: CredentialStore>(
         &self,
         user_id: impl Into<String>,
         username: impl Into<String>,
@@ -268,7 +268,7 @@ impl<'a> RegistrationManager<'a> {
         store: &S,
     ) -> Result<(CreationChallengeResponse, RegistrationState), RegistrationError> {
         let user_id = user_id.into();
-        let existing = store.get_passkeys_for_user(&user_id);
+        let existing = store.get_passkeys_for_user(&user_id).await;
         let existing = if existing.is_empty() {
             None
         } else {
@@ -281,16 +281,17 @@ impl<'a> RegistrationManager<'a> {
     /// 完成注册并保存凭证
     ///
     /// 便捷方法，自动保存凭证到存储
-    pub fn finish_registration_and_save<S: CredentialStore>(
+    pub async fn finish_registration_and_save<S: CredentialStore>(
         &self,
         state: &RegistrationState,
         response: &RegisterPublicKeyCredential,
-        store: &mut S,
+        store: &S,
     ) -> Result<StoredCredential, RegistrationError> {
         let credential = self.finish_registration(state, response)?;
 
         store
             .save(credential.clone())
+            .await
             .map_err(|e| RegistrationError::StorageError(e.to_string()))?;
 
         Ok(credential)
