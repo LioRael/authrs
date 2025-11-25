@@ -19,7 +19,7 @@
 //! let manager = TotpManager::new(config);
 //!
 //! // 为用户生成密钥
-//! let secret = manager.generate_secret();
+//! let secret = manager.generate_secret().unwrap();
 //!
 //! // 生成当前 TOTP 码
 //! let code = manager.generate_code(&secret).unwrap();
@@ -30,8 +30,7 @@
 //! assert!(is_valid);
 //! ```
 
-use base32::{decode as base32_decode, encode as base32_encode, Alphabet};
-use chrono::Utc;
+use base32::{Alphabet, decode as base32_decode, encode as base32_encode};
 use hmac::{Hmac, Mac};
 use sha1::Sha1;
 use sha2::{Sha256, Sha512};
@@ -317,7 +316,7 @@ impl TotpManager {
         issuer: &str,
     ) -> String {
         let label = format!("{}:{}", issuer, account);
-        let mut uri = format!(
+        let uri = format!(
             "otpauth://totp/{}?secret={}&digits={}&period={}&algorithm={}&issuer={}",
             urlencoding::encode(&label),
             secret.base32,
@@ -419,6 +418,7 @@ pub struct RecoveryCodeManager {
     /// 恢复码数量
     code_count: usize,
     /// 恢复码长度（不含分隔符）
+    #[allow(dead_code)]
     code_length: usize,
 }
 

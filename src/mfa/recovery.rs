@@ -34,7 +34,7 @@
 
 use std::collections::HashSet;
 
-use crate::error::{Error, Result, ValidationError};
+use crate::error::Result;
 use crate::password::{hash_password, verify_password};
 use crate::random::generate_random_bytes;
 

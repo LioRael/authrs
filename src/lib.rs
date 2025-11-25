@@ -10,8 +10,21 @@
 //! - **JWT Token**: JSON Web Token 的生成、验证和刷新
 //! - **Session 管理**: 安全的 Session 创建、验证和存储
 //! - **Refresh Token**: Token 轮换和重用检测
+//! - **MFA**: TOTP/HOTP 多因素认证
 //! - **速率限制**: 防止暴力破解攻击
 //! - **CSRF 防护**: 跨站请求伪造防护
+//!
+//! ## Features
+//!
+//! 本库使用 Cargo features 来允许用户选择性地启用功能：
+//!
+//! - `argon2` - 启用 Argon2id 密码哈希支持（默认启用）
+//! - `bcrypt` - 启用 bcrypt 密码哈希支持
+//! - `jwt` - 启用 JWT 支持（默认启用）
+//! - `mfa` - 启用 TOTP/HOTP 多因素认证（默认启用）
+//! - `full` - 启用所有功能
+//!
+//! 默认启用的 features: `argon2`, `jwt`, `mfa`
 //!
 //! ## 密码哈希示例
 //!
@@ -41,7 +54,8 @@
 //!
 //! ## JWT Token 示例
 //!
-//! ```rust
+#![cfg_attr(feature = "jwt", doc = "```rust")]
+#![cfg_attr(not(feature = "jwt"), doc = "```rust,ignore")]
 //! use authrs::token::jwt::{JwtBuilder, JwtValidator};
 //!
 //! // 创建 JWT
@@ -76,6 +90,7 @@
 //! ```
 
 pub mod error;
+pub mod mfa;
 pub mod password;
 pub mod random;
 pub mod security;
@@ -83,23 +98,47 @@ pub mod token;
 
 pub use error::{Error, Result};
 
-// 重新导出常用的密码相关类型
+// ============================================================================
+// 密码相关导出
+// ============================================================================
+
 pub use password::{Algorithm, PasswordHasher, hash_password, verify_password};
 
-// 重新导出常用的随机数生成函数
+// ============================================================================
+// 随机数生成函数导出
+// ============================================================================
+
 pub use random::{
     constant_time_compare, constant_time_compare_str, generate_api_key, generate_csrf_token,
     generate_random_alphanumeric, generate_random_base64_url, generate_random_bytes,
     generate_random_hex, generate_recovery_codes, generate_reset_token, generate_session_token,
 };
 
-// 重新导出常用的 Token 相关类型
+// ============================================================================
+// Token 相关导出
+// ============================================================================
+
+#[cfg(feature = "jwt")]
 pub use token::jwt::{
     Claims, JwtAlgorithm, JwtBuilder, JwtValidator, TokenPair, TokenPairGenerator,
 };
 pub use token::refresh::{RefreshConfig, RefreshToken, RefreshTokenManager};
 pub use token::session::{Session, SessionConfig, SessionManager, SessionStore};
 
-// 重新导出安全防护相关类型
+// ============================================================================
+// MFA 相关导出
+// ============================================================================
+
+#[cfg(feature = "mfa")]
+pub use mfa::hotp::{HotpConfig, HotpGenerator};
+#[cfg(feature = "mfa")]
+pub use mfa::recovery::{RecoveryCodeManager, RecoveryCodeSet, RecoveryConfig};
+#[cfg(feature = "mfa")]
+pub use mfa::totp::{TotpConfig, TotpManager, TotpSecret};
+
+// ============================================================================
+// 安全防护相关导出
+// ============================================================================
+
 pub use security::csrf::{CsrfConfig, CsrfProtection, CsrfToken};
 pub use security::rate_limit::{RateLimitConfig, RateLimitInfo, RateLimiter};

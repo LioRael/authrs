@@ -4,13 +4,18 @@
 //!
 //! ## 子模块
 //!
-//! - **jwt**: JSON Web Token (JWT) 的生成和验证
+//! - **jwt**: JSON Web Token (JWT) 的生成和验证（需启用 `jwt` feature）
 //! - **session**: Session Token 管理
 //! - **refresh**: Refresh Token 机制
 //!
+//! ## Features
+//!
+//! - `jwt` - 启用 JWT 支持（默认启用）
+//!
 //! ## JWT 示例
 //!
-//! ```rust
+#![cfg_attr(feature = "jwt", doc = "```rust")]
+#![cfg_attr(not(feature = "jwt"), doc = "```rust,ignore")]
 //! use authrs::token::jwt::{JwtBuilder, JwtValidator};
 //!
 //! // 创建 JWT
@@ -66,10 +71,12 @@
 //! }
 //! ```
 
+#[cfg(feature = "jwt")]
 pub mod jwt;
 pub mod refresh;
 pub mod session;
 
+#[cfg(feature = "jwt")]
 pub use jwt::{
     Claims, JwtAlgorithm, JwtBuilder, JwtValidator, JwtValidatorConfig, TokenPair,
     TokenPairGenerator,

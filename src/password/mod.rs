@@ -4,12 +4,17 @@
 //!
 //! ## 支持的算法
 //!
-//! - **Argon2** (推荐): 内存硬哈希算法，抵抗 GPU/ASIC 攻击
-//! - **bcrypt**: 经典的密码哈希算法，广泛使用
+//! - **Argon2** (推荐): 内存硬哈希算法，抵抗 GPU/ASIC 攻击（需启用 `argon2` feature）
+//! - **bcrypt**: 经典的密码哈希算法，广泛使用（需启用 `bcrypt` feature）
+//!
+//! ## Features
+//!
+//! - `argon2` - 启用 Argon2id 密码哈希支持（默认启用）
+//! - `bcrypt` - 启用 bcrypt 密码哈希支持
 //!
 //! ## 示例
 //!
-//! ### 使用默认算法 (Argon2)
+//! ### 使用默认算法
 //!
 //! ```rust
 //! use authrs::password::{hash_password, verify_password};
@@ -24,7 +29,8 @@
 //!
 //! ### 使用指定算法
 //!
-//! ```rust
+#![cfg_attr(feature = "bcrypt", doc = "```rust")]
+#![cfg_attr(not(feature = "bcrypt"), doc = "```rust,ignore")]
 //! use authrs::password::{PasswordHasher, Algorithm};
 //!
 //! let hasher = PasswordHasher::new(Algorithm::Bcrypt);
@@ -47,8 +53,8 @@
 mod hasher;
 pub mod strength;
 
-pub use hasher::{hash_password, verify_password, Algorithm, PasswordHasher};
+pub use hasher::{Algorithm, PasswordHasher, hash_password, verify_password};
 pub use strength::{
-    check_password_strength, validate_password_strength, validate_password_with_requirements,
     PasswordFeatures, PasswordRequirements, PasswordStrength, StrengthResult,
+    check_password_strength, validate_password_strength, validate_password_with_requirements,
 };
