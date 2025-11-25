@@ -254,7 +254,7 @@ impl IntrospectionResponseBuilder {
     }
 
     /// 设置主题
-    pub fn sub(mut self, sub: impl Into<String>) -> Self {
+    pub fn subject(mut self, sub: impl Into<String>) -> Self {
         self.sub = Some(sub.into());
         self
     }
@@ -340,7 +340,7 @@ mod tests {
             .client_id("test-client")
             .username("testuser")
             .token_type("Bearer")
-            .sub("user123")
+            .subject("user123")
             .iss("https://auth.example.com")
             .build();
 
@@ -421,7 +421,7 @@ mod tests {
         let response = IntrospectionResponse::active()
             .scope("read write")
             .client_id("test-client")
-            .sub("user123")
+            .subject("user123")
             .exp(1234567890)
             .build();
 

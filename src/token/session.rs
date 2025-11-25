@@ -216,10 +216,10 @@ impl Session {
     /// session.set_metadata("permissions", vec!["read", "write"]);
     /// ```
     pub fn set_metadata<T: Serialize>(&mut self, key: impl Into<String>, value: T) {
-        if let Ok(json_value) = serde_json::to_value(value) {
-            if let Some(obj) = self.metadata.as_object_mut() {
-                obj.insert(key.into(), json_value);
-            }
+        if let Ok(json_value) = serde_json::to_value(value)
+            && let Some(obj) = self.metadata.as_object_mut()
+        {
+            obj.insert(key.into(), json_value);
         }
     }
 
@@ -751,21 +751,19 @@ impl SessionManager {
         }
 
         // 验证 IP 地址
-        if self.config.validate_ip {
-            if let (Some(stored_ip), Some(request_ip)) = (&session.ip_address, ip_address) {
-                if stored_ip != request_ip {
-                    return Err(Error::validation("IP address mismatch"));
-                }
-            }
+        if self.config.validate_ip
+            && let (Some(stored_ip), Some(request_ip)) = (&session.ip_address, ip_address)
+            && stored_ip != request_ip
+        {
+            return Err(Error::validation("IP address mismatch"));
         }
 
         // 验证 User-Agent
-        if self.config.validate_user_agent {
-            if let (Some(stored_ua), Some(request_ua)) = (&session.user_agent, user_agent) {
-                if stored_ua != request_ua {
-                    return Err(Error::validation("User-Agent mismatch"));
-                }
-            }
+        if self.config.validate_user_agent
+            && let (Some(stored_ua), Some(request_ua)) = (&session.user_agent, user_agent)
+            && stored_ua != request_ua
+        {
+            return Err(Error::validation("User-Agent mismatch"));
         }
 
         Ok(session)

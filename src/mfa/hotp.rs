@@ -71,7 +71,7 @@ impl HotpConfig {
 
     /// 设置验证码位数
     pub fn with_digits(mut self, digits: u32) -> Self {
-        assert!(digits >= 6 && digits <= 8, "digits must be between 6 and 8");
+        assert!((6..=8).contains(&digits), "digits must be between 6 and 8");
         self.digits = digits;
         self
     }

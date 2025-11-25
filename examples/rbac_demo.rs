@@ -404,7 +404,7 @@ fn demo_real_world_scenario() {
         let permissions = role_manager.get_effective_permissions(role_name);
         for perm in permissions {
             policy_engine.add_policy(
-                Policy::allow(&format!(
+                Policy::allow(format!(
                     "{}-{}-{}",
                     role_name,
                     perm.resource(),

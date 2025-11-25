@@ -74,7 +74,7 @@
 //! let response = IntrospectionResponse::active()
 //!     .scope("read write")
 //!     .client_id("client_123")
-//!     .sub("user_456")
+//!     .subject("user_456")
 //!     .build();
 //! ```
 

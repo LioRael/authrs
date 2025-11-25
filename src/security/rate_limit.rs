@@ -357,11 +357,11 @@ impl RateLimitStore for InMemorySlidingWindowStore {
             record.violation_count += 1;
 
             // 检查是否需要封禁
-            if let Some(ban_duration) = config.ban_duration {
-                if record.violation_count >= config.ban_threshold {
-                    record.banned_until = Some(Instant::now() + ban_duration);
-                    return Err(Error::rate_limited(ban_duration));
-                }
+            if let Some(ban_duration) = config.ban_duration
+                && record.violation_count >= config.ban_threshold
+            {
+                record.banned_until = Some(Instant::now() + ban_duration);
+                return Err(Error::rate_limited(ban_duration));
             }
 
             let reset_after = record
@@ -440,11 +440,11 @@ impl RateLimitStore for InMemorySlidingWindowStore {
     }
 
     fn unban(&self, key: &str) {
-        if let Ok(mut records) = self.records.write() {
-            if let Some(record) = records.get_mut(key) {
-                record.banned_until = None;
-                record.violation_count = 0;
-            }
+        if let Ok(mut records) = self.records.write()
+            && let Some(record) = records.get_mut(key)
+        {
+            record.banned_until = None;
+            record.violation_count = 0;
         }
     }
 
@@ -453,10 +453,10 @@ impl RateLimitStore for InMemorySlidingWindowStore {
             let now = Instant::now();
             records.retain(|_, record| {
                 // 保留被封禁的记录
-                if let Some(until) = record.banned_until {
-                    if now < until {
-                        return true;
-                    }
+                if let Some(until) = record.banned_until
+                    && now < until
+                {
+                    return true;
                 }
                 // 保留最近有请求的记录（最近 1 小时）
                 if let Some(last) = record.timestamps.last() {
@@ -521,11 +521,11 @@ impl RateLimitStore for InMemoryFixedWindowStore {
             record.violation_count += 1;
 
             // 检查是否需要封禁
-            if let Some(ban_duration) = config.ban_duration {
-                if record.violation_count >= config.ban_threshold {
-                    record.banned_until = Some(Instant::now() + ban_duration);
-                    return Err(Error::rate_limited(ban_duration));
-                }
+            if let Some(ban_duration) = config.ban_duration
+                && record.violation_count >= config.ban_threshold
+            {
+                record.banned_until = Some(Instant::now() + ban_duration);
+                return Err(Error::rate_limited(ban_duration));
             }
 
             let reset_after = config.window.saturating_sub(record.window_start.elapsed());
@@ -597,11 +597,11 @@ impl RateLimitStore for InMemoryFixedWindowStore {
     }
 
     fn unban(&self, key: &str) {
-        if let Ok(mut records) = self.records.write() {
-            if let Some(record) = records.get_mut(key) {
-                record.banned_until = None;
-                record.violation_count = 0;
-            }
+        if let Ok(mut records) = self.records.write()
+            && let Some(record) = records.get_mut(key)
+        {
+            record.banned_until = None;
+            record.violation_count = 0;
         }
     }
 
@@ -610,10 +610,10 @@ impl RateLimitStore for InMemoryFixedWindowStore {
             let now = Instant::now();
             records.retain(|_, record| {
                 // 保留被封禁的记录
-                if let Some(until) = record.banned_until {
-                    if now < until {
-                        return true;
-                    }
+                if let Some(until) = record.banned_until
+                    && now < until
+                {
+                    return true;
                 }
                 // 保留最近 1 小时内活跃的窗口
                 record.window_start.elapsed() < Duration::from_secs(3600)

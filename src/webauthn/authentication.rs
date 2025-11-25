@@ -270,14 +270,14 @@ impl<'a> AuthenticationManager<'a> {
             self.finish_authentication(state, response, &credentials)?;
 
         // 更新凭证（如果有变化）
-        if let Some(passkey) = updated_passkey {
-            if let Some(mut stored) = store.find_by_id(&result.credential_id) {
-                stored.update_passkey(passkey);
-                stored.record_use();
-                store
-                    .update(stored)
-                    .map_err(|e| AuthenticationError::StorageError(e.to_string()))?;
-            }
+        if let Some(passkey) = updated_passkey
+            && let Some(mut stored) = store.find_by_id(&result.credential_id)
+        {
+            stored.update_passkey(passkey);
+            stored.record_use();
+            store
+                .update(stored)
+                .map_err(|e| AuthenticationError::StorageError(e.to_string()))?;
         }
 
         Ok(result)

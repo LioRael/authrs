@@ -896,9 +896,9 @@ mod tests {
 
         let results = engine.check_permissions(&editor, &permissions);
 
-        assert_eq!(results[&("posts".to_string(), "read".to_string())], true);
-        assert_eq!(results[&("posts".to_string(), "write".to_string())], true);
-        assert_eq!(results[&("posts".to_string(), "delete".to_string())], false);
-        assert_eq!(results[&("users".to_string(), "read".to_string())], false);
+        assert!(results[&("posts".to_string(), "read".to_string())]);
+        assert!(results[&("posts".to_string(), "write".to_string())]);
+        assert!(!results[&("posts".to_string(), "delete".to_string())]);
+        assert!(!results[&("users".to_string(), "read".to_string())]);
     }
 }

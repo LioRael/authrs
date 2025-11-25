@@ -283,7 +283,7 @@ fn test_api_key_stats() {
     // 创建并添加一些 key
     for i in 0..5 {
         let (key, _) = manager
-            .create_key(&format!("service-{}", i))
+            .create_key(format!("service-{}", i))
             .with_prefix("sk_stats")
             .build()
             .unwrap();
@@ -295,7 +295,7 @@ fn test_api_key_stats() {
         let all_keys = manager.list();
         all_keys[0].id.clone()
     };
-    manager.revoke(&first_key_id).unwrap();
+    let _ = manager.revoke(&first_key_id);
 
     // 检查统计
     let stats = manager.stats();
@@ -380,7 +380,7 @@ fn test_production_config() {
     let expires_at = key.expires_at.unwrap();
     let days_until_expiry = (expires_at - Utc::now()).num_days();
     assert!(
-        days_until_expiry >= 89 && days_until_expiry <= 90,
+        (89..=90).contains(&days_until_expiry),
         "Expiry should be ~90 days"
     );
 }

@@ -184,12 +184,11 @@ impl<'a> RegistrationManager<'a> {
         let credential_name = credential_name.into();
 
         // 检查凭证数量限制
-        if let Some(max) = self.config.max_credentials_per_user {
-            if let Some(ref creds) = existing_credentials {
-                if creds.len() >= max {
-                    return Err(RegistrationError::MaxCredentialsReached(max));
-                }
-            }
+        if let Some(max) = self.config.max_credentials_per_user
+            && let Some(ref creds) = existing_credentials
+            && creds.len() >= max
+        {
+            return Err(RegistrationError::MaxCredentialsReached(max));
         }
 
         // 解析用户 ID 为 UUID（如果不是有效 UUID，则生成一个确定性 UUID）

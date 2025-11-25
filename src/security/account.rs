@@ -358,10 +358,10 @@ impl LoginAttemptTracker {
         self.cleanup_expired();
 
         // 检查 IP 封禁
-        if let Some(ip_addr) = ip {
-            if self.is_ip_banned(ip_addr) {
-                return LoginCheckResult::IpBanned { ip: ip_addr };
-            }
+        if let Some(ip_addr) = ip
+            && self.is_ip_banned(ip_addr)
+        {
+            return LoginCheckResult::IpBanned { ip: ip_addr };
         }
 
         // 获取或创建账户状态
@@ -381,14 +381,14 @@ impl LoginAttemptTracker {
         }
 
         // 检查递增延迟
-        if !status.can_attempt_now() {
-            if let Some(next_allowed) = status.next_attempt_allowed_at() {
-                let wait_time = next_allowed - Utc::now();
-                if wait_time.num_seconds() > 0 {
-                    return LoginCheckResult::DelayRequired {
-                        wait_time: Duration::seconds(wait_time.num_seconds()),
-                    };
-                }
+        if !status.can_attempt_now()
+            && let Some(next_allowed) = status.next_attempt_allowed_at()
+        {
+            let wait_time = next_allowed - Utc::now();
+            if wait_time.num_seconds() > 0 {
+                return LoginCheckResult::DelayRequired {
+                    wait_time: Duration::seconds(wait_time.num_seconds()),
+                };
             }
         }
 
@@ -400,16 +400,16 @@ impl LoginAttemptTracker {
         let now = Utc::now();
 
         // 更新 IP 计数
-        if self.config.track_ip {
-            if let Some(ip) = attempt.ip_address {
-                if !attempt.success {
-                    let entry = self.ip_attempts.entry(ip).or_insert((0, now));
-                    entry.0 += 1;
-                    entry.1 = now;
-                } else {
-                    // 成功登录时重置 IP 计数
-                    self.ip_attempts.remove(&ip);
-                }
+        if self.config.track_ip
+            && let Some(ip) = attempt.ip_address
+        {
+            if !attempt.success {
+                let entry = self.ip_attempts.entry(ip).or_insert((0, now));
+                entry.0 += 1;
+                entry.1 = now;
+            } else {
+                // 成功登录时重置 IP 计数
+                self.ip_attempts.remove(&ip);
             }
         }
 

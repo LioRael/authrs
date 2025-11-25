@@ -429,7 +429,7 @@ mod tests {
     fn test_generate_random_in_range() {
         for _ in 0..100 {
             let val = generate_random_in_range(10, 20);
-            assert!(val >= 10 && val < 20);
+            assert!((10..20).contains(&val));
         }
     }
 

@@ -10,18 +10,13 @@ use crate::error::{Error, Result, StorageError, ValidationError};
 use crate::random::{generate_random_alphanumeric, generate_random_base64_url};
 
 /// OAuth 客户端类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum ClientType {
     /// 机密客户端（可以安全存储密钥的服务端应用）
+    #[default]
     Confidential,
     /// 公开客户端（无法安全存储密钥的客户端应用，如 SPA、移动 App）
     Public,
-}
-
-impl Default for ClientType {
-    fn default() -> Self {
-        ClientType::Confidential
-    }
 }
 
 /// OAuth 客户端配置

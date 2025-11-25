@@ -88,7 +88,7 @@ impl RecoveryConfig {
     /// 设置每组字符数
     pub fn with_group_length(mut self, length: usize) -> Self {
         assert!(
-            length >= 4 && length <= 8,
+            (4..=8).contains(&length),
             "group length must be between 4 and 8"
         );
         self.group_length = length;
@@ -98,7 +98,7 @@ impl RecoveryConfig {
     /// 设置组数
     pub fn with_group_count(mut self, count: usize) -> Self {
         assert!(
-            count >= 1 && count <= 4,
+            (1..=4).contains(&count),
             "group count must be between 1 and 4"
         );
         self.group_count = count;

@@ -29,15 +29,16 @@ compile_error!(
     "At least one password hashing algorithm (argon2 or bcrypt) must be enabled. Enable either 'argon2' or 'bcrypt' feature."
 );
 
+#[allow(clippy::derivable_impls)]
 impl Default for Algorithm {
     fn default() -> Self {
         #[cfg(feature = "argon2")]
         {
-            return Algorithm::Argon2id;
+            Algorithm::Argon2id
         }
         #[cfg(all(not(feature = "argon2"), feature = "bcrypt"))]
         {
-            return Algorithm::Bcrypt;
+            Algorithm::Bcrypt
         }
     }
 }
@@ -192,10 +193,10 @@ impl PasswordHasher {
                     return true;
                 }
                 // 检查 cost 是否匹配
-                if let Some(cost_str) = hash.get(4..6) {
-                    if let Ok(cost) = cost_str.parse::<u32>() {
-                        return cost < self.bcrypt_cost;
-                    }
+                if let Some(cost_str) = hash.get(4..6)
+                    && let Ok(cost) = cost_str.parse::<u32>()
+                {
+                    return cost < self.bcrypt_cost;
                 }
                 true
             }

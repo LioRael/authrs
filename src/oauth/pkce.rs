@@ -45,7 +45,7 @@ use crate::random::generate_random_bytes;
 /// RFC 7636 定义了两种方法：
 /// - `Plain`: code_challenge = code_verifier（不推荐，仅用于不支持 S256 的场景）
 /// - `S256`: code_challenge = BASE64URL(SHA256(code_verifier))（推荐）
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum PkceMethod {
     /// Plain 方法：challenge = verifier
     ///
@@ -55,6 +55,7 @@ pub enum PkceMethod {
     /// S256 方法：challenge = BASE64URL(SHA256(verifier))
     ///
     /// **推荐使用**：提供更强的安全保护
+    #[default]
     S256,
 }
 
@@ -68,7 +69,7 @@ impl PkceMethod {
     /// # Returns
     ///
     /// 返回对应的 `PkceMethod`，无效输入返回错误
-    pub fn from_str(s: &str) -> Result<Self> {
+    pub fn parse(s: &str) -> Result<Self> {
         match s.to_lowercase().as_str() {
             "plain" => Ok(PkceMethod::Plain),
             "s256" => Ok(PkceMethod::S256),
@@ -94,9 +95,11 @@ impl std::fmt::Display for PkceMethod {
     }
 }
 
-impl Default for PkceMethod {
-    fn default() -> Self {
-        PkceMethod::S256
+impl std::str::FromStr for PkceMethod {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        Self::parse(s)
     }
 }
 
@@ -137,7 +140,7 @@ impl PkceConfig {
     pub fn validate(&self) -> Result<()> {
         // Base64 编码后的长度约为 verifier_length * 4/3
         // RFC 7636 要求 43-128 字符
-        let encoded_len = (self.verifier_length * 4 + 2) / 3;
+        let encoded_len = (self.verifier_length * 4).div_ceil(3);
 
         if encoded_len < 43 {
             return Err(Error::Config(ConfigError::InvalidValue {
@@ -473,12 +476,18 @@ mod tests {
 
     #[test]
     fn test_pkce_method_from_str() {
+        use std::str::FromStr;
+
         assert_eq!(PkceMethod::from_str("S256").unwrap(), PkceMethod::S256);
         assert_eq!(PkceMethod::from_str("s256").unwrap(), PkceMethod::S256);
         assert_eq!(PkceMethod::from_str("plain").unwrap(), PkceMethod::Plain);
         assert_eq!(PkceMethod::from_str("PLAIN").unwrap(), PkceMethod::Plain);
 
         assert!(PkceMethod::from_str("invalid").is_err());
+
+        // Also test the parse() convenience method
+        assert_eq!(PkceMethod::parse("S256").unwrap(), PkceMethod::S256);
+        assert!(PkceMethod::parse("invalid").is_err());
     }
 
     #[test]

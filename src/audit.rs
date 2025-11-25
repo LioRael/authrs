@@ -67,11 +67,12 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 /// 事件严重程度
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum EventSeverity {
     /// 调试信息
     Debug,
     /// 一般信息
+    #[default]
     Info,
     /// 警告
     Warning,
@@ -79,12 +80,6 @@ pub enum EventSeverity {
     Error,
     /// 严重/危险
     Critical,
-}
-
-impl Default for EventSeverity {
-    fn default() -> Self {
-        EventSeverity::Info
-    }
 }
 
 impl std::fmt::Display for EventSeverity {
@@ -567,9 +562,10 @@ impl InMemoryAuditLogger {
     /// 获取统计信息
     pub fn get_stats(&self) -> AuditStats {
         let events = self.events.read().unwrap();
-        let mut stats = AuditStats::default();
-
-        stats.total_events = events.len();
+        let mut stats = AuditStats {
+            total_events: events.len(),
+            ..Default::default()
+        };
 
         for event in events.iter() {
             match event.severity {

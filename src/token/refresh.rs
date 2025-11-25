@@ -203,10 +203,10 @@ impl RefreshToken {
     /// token.set_metadata("login_count", 5);
     /// ```
     pub fn set_metadata<T: Serialize>(&mut self, key: impl Into<String>, value: T) {
-        if let Ok(json_value) = serde_json::to_value(value) {
-            if let Some(obj) = self.metadata.as_object_mut() {
-                obj.insert(key.into(), json_value);
-            }
+        if let Ok(json_value) = serde_json::to_value(value)
+            && let Some(obj) = self.metadata.as_object_mut()
+        {
+            obj.insert(key.into(), json_value);
         }
     }
 
@@ -962,16 +962,15 @@ impl RefreshTokenManager {
 
         // 如果超出限制，删除最旧的家族
         // 使用 (created_at, family_id) 作为排序键，确保在时间戳相同时有确定性行为
-        if families.len() >= self.config.max_families_per_user {
-            if let Some((oldest_family, _)) =
+        if families.len() >= self.config.max_families_per_user
+            && let Some((oldest_family, _)) =
                 families
                     .iter()
                     .min_by(|(id_a, created_a), (id_b, created_b)| {
                         created_a.cmp(created_b).then_with(|| id_a.cmp(id_b))
                     })
-            {
-                self.store.delete_family(oldest_family)?;
-            }
+        {
+            self.store.delete_family(oldest_family)?;
         }
 
         Ok(())

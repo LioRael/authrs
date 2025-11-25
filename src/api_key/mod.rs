@@ -106,9 +106,10 @@ impl ApiKeyConfig {
 }
 
 /// API Key 状态
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum ApiKeyStatus {
     /// 活跃状态
+    #[default]
     Active,
     /// 已撤销
     Revoked,
@@ -116,12 +117,6 @@ pub enum ApiKeyStatus {
     Expired,
     /// 已禁用
     Disabled,
-}
-
-impl Default for ApiKeyStatus {
-    fn default() -> Self {
-        ApiKeyStatus::Active
-    }
 }
 
 /// API Key 结构

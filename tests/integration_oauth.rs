@@ -164,7 +164,7 @@ fn test_introspection_response() {
         .scope("read write")
         .client_id("client_123")
         .username("alice")
-        .sub("user_456")
+        .subject("user_456")
         .exp(chrono::Utc::now().timestamp() + 3600)
         .build();
 
@@ -356,7 +356,7 @@ fn test_authorization_code_flow_simulation() {
     let introspection_response = IntrospectionResponse::active()
         .client_id(&client_id)
         .scope("read write")
-        .sub("user_123")
+        .subject("user_123")
         .build();
 
     assert!(introspection_response.active);

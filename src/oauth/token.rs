@@ -6,19 +6,14 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 
 /// OAuth Token 类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum TokenType {
     /// Bearer Token（最常见的类型）
+    #[default]
     Bearer,
     /// MAC Token
     Mac,
-}
-
-impl Default for TokenType {
-    fn default() -> Self {
-        TokenType::Bearer
-    }
 }
 
 impl std::fmt::Display for TokenType {

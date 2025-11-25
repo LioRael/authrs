@@ -177,7 +177,7 @@ fn test_recent_events() {
     // 记录 10 个事件
     for i in 0..10 {
         logger.log(SecurityEvent::login_success(
-            &format!("user_{}", i),
+            format!("user_{}", i),
             "10.0.0.1",
         ));
     }
@@ -256,7 +256,7 @@ fn test_max_events_limit() {
     // 记录超过限制的事件
     for i in 0..10 {
         logger.log(SecurityEvent::login_success(
-            &format!("user_{}", i),
+            format!("user_{}", i),
             "10.0.0.1",
         ));
     }
