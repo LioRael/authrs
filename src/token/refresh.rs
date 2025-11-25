@@ -56,6 +56,7 @@
 //! let manager = RefreshTokenManager::with_store(RefreshConfig::default(), store);
 //! ```
 
+use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::collections::HashMap;
@@ -410,45 +411,46 @@ impl RefreshConfig {
 ///     // ... 实现其他方法
 /// }
 /// ```
+#[async_trait]
 pub trait RefreshTokenStore: Send + Sync {
     /// 保存 Token
-    fn save(&self, token: &RefreshToken) -> Result<()>;
+    async fn save(&self, token: &RefreshToken) -> Result<()>;
 
     /// 通过 Token 值获取 Token
-    fn get_by_token(&self, token: &str) -> Result<Option<RefreshToken>>;
+    async fn get_by_token(&self, token: &str) -> Result<Option<RefreshToken>>;
 
     /// 通过 Token ID 获取 Token
-    fn get_by_id(&self, token_id: &str) -> Result<Option<RefreshToken>>;
+    async fn get_by_id(&self, token_id: &str) -> Result<Option<RefreshToken>>;
 
     /// 更新 Token
-    fn update(&self, token: &RefreshToken) -> Result<()>;
+    async fn update(&self, token: &RefreshToken) -> Result<()>;
 
     /// 删除 Token
-    fn delete(&self, token_id: &str) -> Result<()>;
+    async fn delete(&self, token_id: &str) -> Result<()>;
 
     /// 获取用户的所有 Token
-    fn get_by_user(&self, user_id: &str) -> Result<Vec<RefreshToken>>;
+    async fn get_by_user(&self, user_id: &str) -> Result<Vec<RefreshToken>>;
 
     /// 获取 Token 家族的所有 Token
-    fn get_by_family(&self, family_id: &str) -> Result<Vec<RefreshToken>>;
+    async fn get_by_family(&self, family_id: &str) -> Result<Vec<RefreshToken>>;
 
     /// 删除 Token 家族的所有 Token
     ///
     /// 返回删除的 Token 数量
-    fn delete_family(&self, family_id: &str) -> Result<usize>;
+    async fn delete_family(&self, family_id: &str) -> Result<usize>;
 
     /// 删除用户的所有 Token
     ///
     /// 返回删除的 Token 数量
-    fn delete_by_user(&self, user_id: &str) -> Result<usize>;
+    async fn delete_by_user(&self, user_id: &str) -> Result<usize>;
 
     /// 清理过期的 Token
     ///
     /// 返回清理的 Token 数量
-    fn cleanup_expired(&self) -> Result<usize>;
+    async fn cleanup_expired(&self) -> Result<usize>;
 
     /// 获取 Token 总数
-    fn count(&self) -> Result<usize>;
+    async fn count(&self) -> Result<usize>;
 }
 
 // ============================================================================
@@ -477,8 +479,9 @@ impl InMemoryRefreshTokenStore {
     }
 }
 
+#[async_trait]
 impl RefreshTokenStore for InMemoryRefreshTokenStore {
-    fn save(&self, token: &RefreshToken) -> Result<()> {
+    async fn save(&self, token: &RefreshToken) -> Result<()> {
         let mut tokens = self
             .tokens
             .write()
@@ -493,7 +496,7 @@ impl RefreshTokenStore for InMemoryRefreshTokenStore {
         Ok(())
     }
 
-    fn get_by_token(&self, token: &str) -> Result<Option<RefreshToken>> {
+    async fn get_by_token(&self, token: &str) -> Result<Option<RefreshToken>> {
         let index = self
             .token_index
             .read()
@@ -510,7 +513,7 @@ impl RefreshTokenStore for InMemoryRefreshTokenStore {
         }
     }
 
-    fn get_by_id(&self, token_id: &str) -> Result<Option<RefreshToken>> {
+    async fn get_by_id(&self, token_id: &str) -> Result<Option<RefreshToken>> {
         let tokens = self
             .tokens
             .read()
@@ -518,7 +521,7 @@ impl RefreshTokenStore for InMemoryRefreshTokenStore {
         Ok(tokens.get(token_id).cloned())
     }
 
-    fn update(&self, token: &RefreshToken) -> Result<()> {
+    async fn update(&self, token: &RefreshToken) -> Result<()> {
         let mut tokens = self
             .tokens
             .write()
@@ -534,7 +537,7 @@ impl RefreshTokenStore for InMemoryRefreshTokenStore {
         }
     }
 
-    fn delete(&self, token_id: &str) -> Result<()> {
+    async fn delete(&self, token_id: &str) -> Result<()> {
         let mut tokens = self
             .tokens
             .write()
@@ -550,7 +553,7 @@ impl RefreshTokenStore for InMemoryRefreshTokenStore {
         Ok(())
     }
 
-    fn get_by_user(&self, user_id: &str) -> Result<Vec<RefreshToken>> {
+    async fn get_by_user(&self, user_id: &str) -> Result<Vec<RefreshToken>> {
         let tokens = self
             .tokens
             .read()
@@ -563,7 +566,7 @@ impl RefreshTokenStore for InMemoryRefreshTokenStore {
             .collect())
     }
 
-    fn get_by_family(&self, family_id: &str) -> Result<Vec<RefreshToken>> {
+    async fn get_by_family(&self, family_id: &str) -> Result<Vec<RefreshToken>> {
         let tokens = self
             .tokens
             .read()
@@ -576,7 +579,7 @@ impl RefreshTokenStore for InMemoryRefreshTokenStore {
             .collect())
     }
 
-    fn delete_family(&self, family_id: &str) -> Result<usize> {
+    async fn delete_family(&self, family_id: &str) -> Result<usize> {
         let mut tokens = self
             .tokens
             .write()
@@ -601,7 +604,7 @@ impl RefreshTokenStore for InMemoryRefreshTokenStore {
         Ok(count)
     }
 
-    fn delete_by_user(&self, user_id: &str) -> Result<usize> {
+    async fn delete_by_user(&self, user_id: &str) -> Result<usize> {
         let mut tokens = self
             .tokens
             .write()
@@ -626,7 +629,7 @@ impl RefreshTokenStore for InMemoryRefreshTokenStore {
         Ok(count)
     }
 
-    fn cleanup_expired(&self) -> Result<usize> {
+    async fn cleanup_expired(&self) -> Result<usize> {
         let mut tokens = self
             .tokens
             .write()
@@ -652,7 +655,7 @@ impl RefreshTokenStore for InMemoryRefreshTokenStore {
         Ok(count)
     }
 
-    fn count(&self) -> Result<usize> {
+    async fn count(&self) -> Result<usize> {
         let tokens = self
             .tokens
             .read()
@@ -742,13 +745,13 @@ impl RefreshTokenManager {
     /// # 返回
     ///
     /// 返回生成的 Token
-    pub fn generate(&self, user_id: impl Into<String>) -> Result<RefreshToken> {
+    pub async fn generate(&self, user_id: impl Into<String>) -> Result<RefreshToken> {
         let user_id = user_id.into();
-        self.enforce_max_families(&user_id)?;
+        self.enforce_max_families(&user_id).await?;
 
         let family_id = generate_random_hex(16)?;
         let token = RefreshToken::new(&user_id, family_id, self.config.expiration)?;
-        self.store.save(&token)?;
+        self.store.save(&token).await?;
 
         Ok(token)
     }
@@ -756,13 +759,13 @@ impl RefreshTokenManager {
     /// 使用选项生成 Refresh Token
     ///
     /// 允许设置设备信息、IP 地址和初始元数据。
-    pub fn generate_with_options(
+    pub async fn generate_with_options(
         &self,
         user_id: impl Into<String>,
         options: GenerateOptions,
     ) -> Result<RefreshToken> {
         let user_id = user_id.into();
-        self.enforce_max_families(&user_id)?;
+        self.enforce_max_families(&user_id).await?;
 
         let family_id = options
             .family_id
@@ -776,7 +779,7 @@ impl RefreshTokenManager {
             token.metadata = metadata;
         }
 
-        self.store.save(&token)?;
+        self.store.save(&token).await?;
         Ok(token)
     }
 
@@ -792,15 +795,16 @@ impl RefreshTokenManager {
     /// # 返回
     ///
     /// 返回使用结果，包含新 Token（如果启用轮换）
-    pub fn use_token(&self, token: &str) -> Result<TokenUseResult> {
+    pub async fn use_token(&self, token: &str) -> Result<TokenUseResult> {
         let mut stored_token = self
             .store
-            .get_by_token(token)?
+            .get_by_token(token)
+            .await?
             .ok_or_else(|| Error::Token(TokenError::InvalidFormat("token not found".into())))?;
 
         // 检查是否过期
         if stored_token.is_expired() {
-            self.store.delete(&stored_token.token_id)?;
+            self.store.delete(&stored_token.token_id).await?;
             return Err(Error::Token(TokenError::Expired));
         }
 
@@ -815,7 +819,7 @@ impl RefreshTokenManager {
                 // 如果宽限期为 0，或者已超过宽限期，则触发重用检测
                 if grace_period_secs == 0 || now > used_at + grace_period_secs {
                     // 撤销整个家族
-                    self.store.delete_family(&stored_token.family_id)?;
+                    self.store.delete_family(&stored_token.family_id).await?;
                     return Err(Error::Token(TokenError::InvalidFormat(
                         "token reuse detected, family revoked".into(),
                     )));
@@ -851,19 +855,20 @@ impl RefreshTokenManager {
 
             // 标记旧 Token 为已使用
             stored_token.mark_as_used(Some(new.token_id.clone()));
-            self.store.update(&stored_token)?;
+            self.store.update(&stored_token).await?;
 
             // 保存新 Token
-            self.store.save(&new)?;
+            self.store.save(&new).await?;
 
             // 清理家族中的旧 Token
-            self.enforce_max_tokens_per_family(&stored_token.family_id)?;
+            self.enforce_max_tokens_per_family(&stored_token.family_id)
+                .await?;
 
             Some(new)
         } else {
             // 不轮换，只标记为已使用
             stored_token.mark_as_used(None);
-            self.store.update(&stored_token)?;
+            self.store.update(&stored_token).await?;
             None
         };
 
@@ -878,10 +883,11 @@ impl RefreshTokenManager {
     /// 验证 Token
     ///
     /// 只检查 Token 是否有效，不会使用或轮换 Token。
-    pub fn validate(&self, token: &str) -> Result<RefreshToken> {
+    pub async fn validate(&self, token: &str) -> Result<RefreshToken> {
         let stored_token = self
             .store
-            .get_by_token(token)?
+            .get_by_token(token)
+            .await?
             .ok_or_else(|| Error::Token(TokenError::InvalidFormat("token not found".into())))?;
 
         if stored_token.is_expired() {
@@ -898,41 +904,41 @@ impl RefreshTokenManager {
     }
 
     /// 撤销 Token
-    pub fn revoke(&self, token: &str) -> Result<()> {
-        if let Some(stored) = self.store.get_by_token(token)? {
-            self.store.delete(&stored.token_id)?;
+    pub async fn revoke(&self, token: &str) -> Result<()> {
+        if let Some(stored) = self.store.get_by_token(token).await? {
+            self.store.delete(&stored.token_id).await?;
         }
         Ok(())
     }
 
     /// 撤销 Token 家族
-    pub fn revoke_family(&self, family_id: &str) -> Result<usize> {
-        self.store.delete_family(family_id)
+    pub async fn revoke_family(&self, family_id: &str) -> Result<usize> {
+        self.store.delete_family(family_id).await
     }
 
     /// 撤销用户的所有 Token
-    pub fn revoke_all_for_user(&self, user_id: &str) -> Result<usize> {
-        self.store.delete_by_user(user_id)
+    pub async fn revoke_all_for_user(&self, user_id: &str) -> Result<usize> {
+        self.store.delete_by_user(user_id).await
     }
 
     /// 获取用户的所有 Token
-    pub fn get_user_tokens(&self, user_id: &str) -> Result<Vec<RefreshToken>> {
-        self.store.get_by_user(user_id)
+    pub async fn get_user_tokens(&self, user_id: &str) -> Result<Vec<RefreshToken>> {
+        self.store.get_by_user(user_id).await
     }
 
     /// 获取 Token 家族的所有 Token
-    pub fn get_family_tokens(&self, family_id: &str) -> Result<Vec<RefreshToken>> {
-        self.store.get_by_family(family_id)
+    pub async fn get_family_tokens(&self, family_id: &str) -> Result<Vec<RefreshToken>> {
+        self.store.get_by_family(family_id).await
     }
 
     /// 清理过期的 Token
-    pub fn cleanup(&self) -> Result<usize> {
-        self.store.cleanup_expired()
+    pub async fn cleanup(&self) -> Result<usize> {
+        self.store.cleanup_expired().await
     }
 
     /// 获取 Token 总数
-    pub fn count(&self) -> Result<usize> {
-        self.store.count()
+    pub async fn count(&self) -> Result<usize> {
+        self.store.count().await
     }
 
     /// 获取配置
@@ -945,12 +951,12 @@ impl RefreshTokenManager {
     // ========================================================================
 
     /// 强制执行单用户最大 Token 家族数限制
-    fn enforce_max_families(&self, user_id: &str) -> Result<()> {
+    async fn enforce_max_families(&self, user_id: &str) -> Result<()> {
         if self.config.max_families_per_user == 0 {
             return Ok(());
         }
 
-        let tokens = self.store.get_by_user(user_id)?;
+        let tokens = self.store.get_by_user(user_id).await?;
 
         // 收集所有家族 ID 及其创建时间
         let mut families: HashMap<String, i64> = HashMap::new();
@@ -970,19 +976,19 @@ impl RefreshTokenManager {
                         created_a.cmp(created_b).then_with(|| id_a.cmp(id_b))
                     })
         {
-            self.store.delete_family(oldest_family)?;
+            self.store.delete_family(oldest_family).await?;
         }
 
         Ok(())
     }
 
     /// 强制执行单家族最大 Token 数限制
-    fn enforce_max_tokens_per_family(&self, family_id: &str) -> Result<()> {
+    async fn enforce_max_tokens_per_family(&self, family_id: &str) -> Result<()> {
         if self.config.max_tokens_per_family == 0 {
             return Ok(());
         }
 
-        let mut tokens = self.store.get_by_family(family_id)?;
+        let mut tokens = self.store.get_by_family(family_id).await?;
 
         // 按创建时间排序
         tokens.sort_by_key(|t| t.created_at);
@@ -990,7 +996,7 @@ impl RefreshTokenManager {
         // 删除超出限制的旧 Token
         while tokens.len() > self.config.max_tokens_per_family {
             if let Some(oldest) = tokens.first() {
-                self.store.delete(&oldest.token_id)?;
+                self.store.delete(&oldest.token_id).await?;
                 tokens.remove(0);
             }
         }
@@ -1130,144 +1136,149 @@ mod tests {
         assert!(!token.has_metadata("device"));
     }
 
-    #[test]
-    fn test_manager_generate() {
+    #[tokio::test]
+    async fn test_manager_generate() {
         let manager = RefreshTokenManager::new(RefreshConfig::default());
-        let token = manager.generate("user123").unwrap();
+        let token = manager.generate("user123").await.unwrap();
 
         assert_eq!(token.user_id, "user123");
         assert!(!token.token.is_empty());
     }
 
-    #[test]
-    fn test_manager_use_token_with_rotation() {
+    #[tokio::test]
+    async fn test_manager_use_token_with_rotation() {
         let config = RefreshConfig::default().with_rotation(true);
         let manager = RefreshTokenManager::new(config);
 
-        let token = manager.generate("user123").unwrap();
-        let result = manager.use_token(&token.token).unwrap();
+        let token = manager.generate("user123").await.unwrap();
+        let result = manager.use_token(&token.token).await.unwrap();
 
         assert!(result.new_token.is_some());
         assert_eq!(result.user_id, "user123");
 
         // 原 token 应该失效
-        assert!(manager.validate(&token.token).is_err());
+        assert!(manager.validate(&token.token).await.is_err());
     }
 
-    #[test]
-    fn test_manager_use_token_without_rotation() {
+    #[tokio::test]
+    async fn test_manager_use_token_without_rotation() {
         let config = RefreshConfig::default().with_rotation(false);
         let manager = RefreshTokenManager::new(config);
 
-        let token = manager.generate("user123").unwrap();
-        let result = manager.use_token(&token.token).unwrap();
+        let token = manager.generate("user123").await.unwrap();
+        let result = manager.use_token(&token.token).await.unwrap();
 
         assert!(result.new_token.is_none());
     }
 
-    #[test]
-    fn test_manager_reuse_detection() {
+    #[tokio::test]
+    async fn test_manager_reuse_detection() {
         let config = RefreshConfig::default()
             .with_rotation(true)
             .with_reuse_detection(true)
             .with_grace_period(Duration::seconds(0));
         let manager = RefreshTokenManager::new(config);
 
-        let token = manager.generate("user123").unwrap();
+        let token = manager.generate("user123").await.unwrap();
         let token_str = token.token.clone();
         let family_id = token.family_id.clone();
 
         // 第一次使用
-        let result = manager.use_token(&token_str).unwrap();
+        let result = manager.use_token(&token_str).await.unwrap();
         assert!(result.new_token.is_some());
         let new_token = result.new_token.unwrap();
 
         // 尝试重用旧 token（应该触发重用检测）
-        let reuse_result = manager.use_token(&token_str);
+        let reuse_result = manager.use_token(&token_str).await;
         assert!(reuse_result.is_err());
 
         // 整个家族应该被撤销
-        assert!(manager.validate(&new_token.token).is_err());
-        assert_eq!(manager.get_family_tokens(&family_id).unwrap().len(), 0);
+        assert!(manager.validate(&new_token.token).await.is_err());
+        assert_eq!(
+            manager.get_family_tokens(&family_id).await.unwrap().len(),
+            0
+        );
     }
 
-    #[test]
-    fn test_manager_revoke() {
+    #[tokio::test]
+    async fn test_manager_revoke() {
         let manager = RefreshTokenManager::new(RefreshConfig::default());
-        let token = manager.generate("user123").unwrap();
+        let token = manager.generate("user123").await.unwrap();
 
-        manager.revoke(&token.token).unwrap();
-        assert!(manager.validate(&token.token).is_err());
+        manager.revoke(&token.token).await.unwrap();
+        assert!(manager.validate(&token.token).await.is_err());
     }
 
-    #[test]
-    fn test_manager_revoke_all_for_user() {
+    #[tokio::test]
+    async fn test_manager_revoke_all_for_user() {
         let config = RefreshConfig::default().with_max_families_per_user(0);
         let manager = RefreshTokenManager::new(config);
 
-        manager.generate("user123").unwrap();
-        manager.generate("user123").unwrap();
-        manager.generate("user456").unwrap();
+        manager.generate("user123").await.unwrap();
+        manager.generate("user123").await.unwrap();
+        manager.generate("user456").await.unwrap();
 
-        let count = manager.revoke_all_for_user("user123").unwrap();
+        let count = manager.revoke_all_for_user("user123").await.unwrap();
         assert_eq!(count, 2);
 
-        assert_eq!(manager.get_user_tokens("user123").unwrap().len(), 0);
-        assert_eq!(manager.get_user_tokens("user456").unwrap().len(), 1);
+        assert_eq!(manager.get_user_tokens("user123").await.unwrap().len(), 0);
+        assert_eq!(manager.get_user_tokens("user456").await.unwrap().len(), 1);
     }
 
-    #[test]
-    fn test_manager_max_families() {
+    #[tokio::test]
+    async fn test_manager_max_families() {
         let config = RefreshConfig::default().with_max_families_per_user(2);
         let manager = RefreshTokenManager::new(config);
 
-        let t1 = manager.generate("user123").unwrap();
-        let t2 = manager.generate("user123").unwrap();
-        let t3 = manager.generate("user123").unwrap();
+        let t1 = manager.generate("user123").await.unwrap();
+        let t2 = manager.generate("user123").await.unwrap();
+        let t3 = manager.generate("user123").await.unwrap();
 
         // 生成第三个 token 时，应该删除一个旧的家族
         // 最终应该只有 2 个家族存在
-        let tokens = manager.get_user_tokens("user123").unwrap();
+        let tokens = manager.get_user_tokens("user123").await.unwrap();
         let families: std::collections::HashSet<_> =
             tokens.iter().map(|t| t.family_id.clone()).collect();
         assert_eq!(families.len(), 2);
 
         // 验证只有 2 个 token 是有效的（第三个 token 和另一个存活的 token）
-        let valid_count = [&t1.token, &t2.token, &t3.token]
-            .iter()
-            .filter(|t| manager.validate(t).is_ok())
-            .count();
+        let mut valid_count = 0;
+        for t in [&t1.token, &t2.token, &t3.token] {
+            if manager.validate(t).await.is_ok() {
+                valid_count += 1;
+            }
+        }
         assert_eq!(valid_count, 2);
 
         // 第三个 token 应该始终有效（刚创建的）
-        assert!(manager.validate(&t3.token).is_ok());
+        assert!(manager.validate(&t3.token).await.is_ok());
     }
 
-    #[test]
-    fn test_manager_validate() {
+    #[tokio::test]
+    async fn test_manager_validate() {
         let manager = RefreshTokenManager::new(RefreshConfig::default());
-        let token = manager.generate("user123").unwrap();
+        let token = manager.generate("user123").await.unwrap();
 
-        let validated = manager.validate(&token.token).unwrap();
+        let validated = manager.validate(&token.token).await.unwrap();
         assert_eq!(validated.user_id, "user123");
     }
 
-    #[test]
-    fn test_manager_cleanup() {
+    #[tokio::test]
+    async fn test_manager_cleanup() {
         let manager = RefreshTokenManager::new(RefreshConfig::default());
 
         // 创建一个已过期的 token
         let mut token =
             RefreshToken::new("user123", "family1".to_string(), Duration::hours(1)).unwrap();
         token.expires_at = Utc::now().timestamp() - 100;
-        manager.store.save(&token).unwrap();
+        manager.store.save(&token).await.unwrap();
 
         // 创建一个有效的 token
-        manager.generate("user456").unwrap();
+        manager.generate("user456").await.unwrap();
 
-        let cleaned = manager.cleanup().unwrap();
+        let cleaned = manager.cleanup().await.unwrap();
         assert_eq!(cleaned, 1);
-        assert_eq!(manager.count().unwrap(), 1);
+        assert_eq!(manager.count().await.unwrap(), 1);
     }
 
     #[test]
@@ -1282,15 +1293,18 @@ mod tests {
         assert!(!relaxed.reuse_detection);
     }
 
-    #[test]
-    fn test_generate_with_options() {
+    #[tokio::test]
+    async fn test_generate_with_options() {
         let manager = RefreshTokenManager::new(RefreshConfig::default());
 
         let options = GenerateOptions::new()
             .with_device_info("iPhone 15")
             .with_ip_address("192.168.1.1");
 
-        let token = manager.generate_with_options("user123", options).unwrap();
+        let token = manager
+            .generate_with_options("user123", options)
+            .await
+            .unwrap();
 
         assert_eq!(token.device_info, Some("iPhone 15".to_string()));
         assert_eq!(token.ip_address, Some("192.168.1.1".to_string()));
@@ -1304,35 +1318,35 @@ mod tests {
         assert!(ttl > 3500 && ttl <= 3600);
     }
 
-    #[test]
-    fn test_in_memory_store() {
+    #[tokio::test]
+    async fn test_in_memory_store() {
         let store = InMemoryRefreshTokenStore::new();
 
         let token =
             RefreshToken::new("user123", "family1".to_string(), Duration::hours(1)).unwrap();
-        store.save(&token).unwrap();
+        store.save(&token).await.unwrap();
 
-        let retrieved = store.get_by_token(&token.token).unwrap();
+        let retrieved = store.get_by_token(&token.token).await.unwrap();
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().user_id, "user123");
 
-        let by_id = store.get_by_id(&token.token_id).unwrap();
+        let by_id = store.get_by_id(&token.token_id).await.unwrap();
         assert!(by_id.is_some());
 
-        store.delete(&token.token_id).unwrap();
-        assert!(store.get_by_token(&token.token).unwrap().is_none());
+        store.delete(&token.token_id).await.unwrap();
+        assert!(store.get_by_token(&token.token).await.unwrap().is_none());
     }
 
-    #[test]
-    fn test_token_rotation_inherits_metadata() {
+    #[tokio::test]
+    async fn test_token_rotation_inherits_metadata() {
         let manager = RefreshTokenManager::new(RefreshConfig::default().with_rotation(true));
 
-        let mut token = manager.generate("user123").unwrap();
+        let mut token = manager.generate("user123").await.unwrap();
         token.set_metadata("custom_key", "custom_value");
         token.device_info = Some("TestDevice".to_string());
-        manager.store.update(&token).unwrap();
+        manager.store.update(&token).await.unwrap();
 
-        let result = manager.use_token(&token.token).unwrap();
+        let result = manager.use_token(&token.token).await.unwrap();
         let new_token = result.new_token.unwrap();
 
         // 新 token 应该继承元数据和设备信息

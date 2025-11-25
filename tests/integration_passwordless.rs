@@ -12,12 +12,12 @@ use std::time::Duration;
 // ============================================================================
 
 /// 测试基本的 Magic Link 生成和验证流程
-#[test]
-fn test_magic_link_basic_flow() {
+#[tokio::test]
+async fn test_magic_link_basic_flow() {
     let manager = MagicLinkManager::new(MagicLinkConfig::default());
 
     // 生成 magic link token
-    let data = manager.generate("user@example.com").unwrap();
+    let data = manager.generate("user@example.com").await.unwrap();
 
     assert!(!data.token.is_empty());
     assert_eq!(data.identifier, "user@example.com");
@@ -25,118 +25,121 @@ fn test_magic_link_basic_flow() {
     assert!(data.remaining_seconds() > 0);
 
     // 验证 token
-    let email = manager.verify(&data.token).unwrap();
+    let email = manager.verify(&data.token).await.unwrap();
     assert_eq!(email, "user@example.com");
 }
 
 /// 测试 Magic Link 一次性使用
-#[test]
-fn test_magic_link_single_use() {
+#[tokio::test]
+async fn test_magic_link_single_use() {
     let manager = MagicLinkManager::new(MagicLinkConfig::default());
 
-    let data = manager.generate("user@example.com").unwrap();
+    let data = manager.generate("user@example.com").await.unwrap();
 
     // 第一次验证成功
-    assert!(manager.verify(&data.token).is_ok());
+    assert!(manager.verify(&data.token).await.is_ok());
 
     // 第二次验证失败（已被消费）
-    assert!(manager.verify(&data.token).is_err());
+    assert!(manager.verify(&data.token).await.is_err());
 }
 
 /// 测试 Magic Link 无效 token
-#[test]
-fn test_magic_link_invalid_token() {
+#[tokio::test]
+async fn test_magic_link_invalid_token() {
     let manager = MagicLinkManager::new(MagicLinkConfig::default());
 
     // 验证不存在的 token
-    assert!(manager.verify("invalid-token").is_err());
-    assert!(manager.verify("").is_err());
+    assert!(manager.verify("invalid-token").await.is_err());
+    assert!(manager.verify("").await.is_err());
 }
 
 /// 测试 Magic Link 撤销功能
-#[test]
-fn test_magic_link_revoke() {
+#[tokio::test]
+async fn test_magic_link_revoke() {
     let manager = MagicLinkManager::new(MagicLinkConfig::default());
 
-    let data = manager.generate("user@example.com").unwrap();
+    let data = manager.generate("user@example.com").await.unwrap();
 
     // 撤销 token
-    manager.revoke(&data.token).unwrap();
+    manager.revoke(&data.token).await.unwrap();
 
     // 验证失败
-    assert!(manager.verify(&data.token).is_err());
+    assert!(manager.verify(&data.token).await.is_err());
 }
 
 /// 测试 Magic Link 撤销用户所有 token
-#[test]
-fn test_magic_link_revoke_all_for_user() {
+#[tokio::test]
+async fn test_magic_link_revoke_all_for_user() {
     let config = MagicLinkConfig::default().with_max_active_per_user(10);
     let manager = MagicLinkManager::new(config);
 
     // 生成多个 token
-    let t1 = manager.generate("alice@example.com").unwrap();
-    let t2 = manager.generate("alice@example.com").unwrap();
-    let t3 = manager.generate("bob@example.com").unwrap();
+    let t1 = manager.generate("alice@example.com").await.unwrap();
+    let t2 = manager.generate("alice@example.com").await.unwrap();
+    let t3 = manager.generate("bob@example.com").await.unwrap();
 
     // 撤销 alice 的所有 token
-    let count = manager.revoke_all_for_user("alice@example.com").unwrap();
+    let count = manager
+        .revoke_all_for_user("alice@example.com")
+        .await
+        .unwrap();
     assert_eq!(count, 2);
 
     // alice 的 token 都失效
-    assert!(manager.verify(&t1.token).is_err());
-    assert!(manager.verify(&t2.token).is_err());
+    assert!(manager.verify(&t1.token).await.is_err());
+    assert!(manager.verify(&t2.token).await.is_err());
 
     // bob 的 token 仍然有效
-    assert!(manager.verify(&t3.token).is_ok());
+    assert!(manager.verify(&t3.token).await.is_ok());
 }
 
 /// 测试 Magic Link 高安全配置
-#[test]
-fn test_magic_link_high_security_config() {
+#[tokio::test]
+async fn test_magic_link_high_security_config() {
     let config = MagicLinkConfig::high_security();
     let manager = MagicLinkManager::new(config);
 
-    let data = manager.generate("secure@example.com").unwrap();
+    let data = manager.generate("secure@example.com").await.unwrap();
 
     // token 长度更长（base64 编码后）
     assert!(data.token.len() > 50);
 
     // 验证成功
-    assert!(manager.verify(&data.token).is_ok());
+    assert!(manager.verify(&data.token).await.is_ok());
 }
 
 /// 测试 Magic Link 最大活跃 token 限制
-#[test]
-fn test_magic_link_max_active_tokens() {
+#[tokio::test]
+async fn test_magic_link_max_active_tokens() {
     let config = MagicLinkConfig::default().with_max_active_per_user(2);
     let manager = MagicLinkManager::new(config);
 
-    let t1 = manager.generate("user@example.com").unwrap();
-    let t2 = manager.generate("user@example.com").unwrap();
-    let t3 = manager.generate("user@example.com").unwrap();
+    let t1 = manager.generate("user@example.com").await.unwrap();
+    let t2 = manager.generate("user@example.com").await.unwrap();
+    let t3 = manager.generate("user@example.com").await.unwrap();
 
     // t1 应该被删除了（最旧的）
-    assert!(manager.verify(&t1.token).is_err());
+    assert!(manager.verify(&t1.token).await.is_err());
 
     // t2 和 t3 仍然有效
-    assert!(manager.verify(&t2.token).is_ok());
-    assert!(manager.verify(&t3.token).is_ok());
+    assert!(manager.verify(&t2.token).await.is_ok());
+    assert!(manager.verify(&t3.token).await.is_ok());
 }
 
 /// 测试不同用户的 Magic Link 相互独立
-#[test]
-fn test_magic_link_user_isolation() {
+#[tokio::test]
+async fn test_magic_link_user_isolation() {
     let manager = MagicLinkManager::new(MagicLinkConfig::default());
 
-    let alice_token = manager.generate("alice@example.com").unwrap();
-    let bob_token = manager.generate("bob@example.com").unwrap();
+    let alice_token = manager.generate("alice@example.com").await.unwrap();
+    let bob_token = manager.generate("bob@example.com").await.unwrap();
 
     // 验证 alice 的 token
-    let email1 = manager.verify(&alice_token.token).unwrap();
+    let email1 = manager.verify(&alice_token.token).await.unwrap();
     assert_eq!(email1, "alice@example.com");
 
     // bob 的 token 仍然有效
-    let email2 = manager.verify(&bob_token.token).unwrap();
+    let email2 = manager.verify(&bob_token.token).await.unwrap();
     assert_eq!(email2, "bob@example.com");
 }
 
@@ -391,13 +394,13 @@ fn test_all_otp_purposes() {
 // ============================================================================
 
 /// 模拟完整的 Magic Link 登录流程
-#[test]
-fn test_magic_link_login_scenario() {
+#[tokio::test]
+async fn test_magic_link_login_scenario() {
     let manager = MagicLinkManager::new(MagicLinkConfig::default());
 
     // 用户请求 magic link 登录
     let user_email = "alice@example.com";
-    let magic_link_data = manager.generate(user_email).unwrap();
+    let magic_link_data = manager.generate(user_email).await.unwrap();
 
     // 构建登录 URL（应用层负责发送邮件）
     let login_url = format!(
@@ -407,7 +410,7 @@ fn test_magic_link_login_scenario() {
     assert!(login_url.contains(&magic_link_data.token));
 
     // 用户点击链接后，验证 token
-    let verified_email = manager.verify(&magic_link_data.token).unwrap();
+    let verified_email = manager.verify(&magic_link_data.token).await.unwrap();
     assert_eq!(verified_email, user_email);
 
     // 此时应用层可以创建 session 并登录用户
@@ -443,8 +446,8 @@ fn test_otp_login_scenario() {
 }
 
 /// 模拟密码重置流程
-#[test]
-fn test_password_reset_scenario() {
+#[tokio::test]
+async fn test_password_reset_scenario() {
     let config = OtpConfig::default()
         .with_ttl(Duration::from_secs(600)) // 10 分钟
         .with_max_attempts(5)
@@ -470,8 +473,8 @@ fn test_password_reset_scenario() {
 }
 
 /// 模拟邮箱验证流程
-#[test]
-fn test_email_verification_scenario() {
+#[tokio::test]
+async fn test_email_verification_scenario() {
     let config = OtpConfig::default()
         .with_code_length(8)
         .with_ttl(Duration::from_secs(3600)) // 1 小时
@@ -497,8 +500,8 @@ fn test_email_verification_scenario() {
 }
 
 /// 测试 Magic Link 和 OTP 可以同时使用
-#[test]
-fn test_magic_link_and_otp_coexistence() {
+#[tokio::test]
+async fn test_magic_link_and_otp_coexistence() {
     let ml_manager = MagicLinkManager::new(MagicLinkConfig::default());
     let otp_config = OtpConfig::default().with_min_interval(None);
     let otp_manager = OtpManager::new(otp_config);
@@ -506,11 +509,11 @@ fn test_magic_link_and_otp_coexistence() {
     let user = "user@example.com";
 
     // 同时生成 Magic Link 和 OTP
-    let magic_link = ml_manager.generate(user).unwrap();
+    let magic_link = ml_manager.generate(user).await.unwrap();
     let otp = otp_manager.generate(user, OtpPurpose::Login).unwrap();
 
     // 两者都可以独立验证
-    assert!(ml_manager.verify(&magic_link.token).is_ok());
+    assert!(ml_manager.verify(&magic_link.token).await.is_ok());
     assert!(
         otp_manager
             .verify(user, &otp.code, OtpPurpose::Login)

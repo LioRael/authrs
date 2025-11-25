@@ -58,6 +58,7 @@
 //! let manager = SessionManager::with_store(SessionConfig::default(), store);
 //! ```
 
+use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::collections::HashMap;
@@ -431,34 +432,35 @@ impl SessionConfig {
 ///     // ... 实现其他方法
 /// }
 /// ```
+#[async_trait]
 pub trait SessionStore: Send + Sync {
     /// 保存 Session
-    fn save(&self, session: &Session) -> Result<()>;
+    async fn save(&self, session: &Session) -> Result<()>;
 
     /// 获取 Session
-    fn get(&self, session_id: &str) -> Result<Option<Session>>;
+    async fn get(&self, session_id: &str) -> Result<Option<Session>>;
 
     /// 更新 Session
-    fn update(&self, session: &Session) -> Result<()>;
+    async fn update(&self, session: &Session) -> Result<()>;
 
     /// 删除 Session
-    fn delete(&self, session_id: &str) -> Result<()>;
+    async fn delete(&self, session_id: &str) -> Result<()>;
 
     /// 获取用户的所有 Session
-    fn get_by_user(&self, user_id: &str) -> Result<Vec<Session>>;
+    async fn get_by_user(&self, user_id: &str) -> Result<Vec<Session>>;
 
     /// 删除用户的所有 Session
     ///
     /// 返回删除的 Session 数量
-    fn delete_by_user(&self, user_id: &str) -> Result<usize>;
+    async fn delete_by_user(&self, user_id: &str) -> Result<usize>;
 
     /// 清理过期的 Session
     ///
     /// 返回清理的 Session 数量
-    fn cleanup_expired(&self) -> Result<usize>;
+    async fn cleanup_expired(&self) -> Result<usize>;
 
     /// 获取 Session 总数
-    fn count(&self) -> Result<usize>;
+    async fn count(&self) -> Result<usize>;
 }
 
 // ============================================================================
@@ -496,8 +498,9 @@ impl InMemorySessionStore {
     }
 }
 
+#[async_trait]
 impl SessionStore for InMemorySessionStore {
-    fn save(&self, session: &Session) -> Result<()> {
+    async fn save(&self, session: &Session) -> Result<()> {
         let mut sessions = self
             .sessions
             .write()
@@ -506,7 +509,7 @@ impl SessionStore for InMemorySessionStore {
         Ok(())
     }
 
-    fn get(&self, session_id: &str) -> Result<Option<Session>> {
+    async fn get(&self, session_id: &str) -> Result<Option<Session>> {
         let sessions = self
             .sessions
             .read()
@@ -514,7 +517,7 @@ impl SessionStore for InMemorySessionStore {
         Ok(sessions.get(session_id).cloned())
     }
 
-    fn update(&self, session: &Session) -> Result<()> {
+    async fn update(&self, session: &Session) -> Result<()> {
         let mut sessions = self
             .sessions
             .write()
@@ -531,7 +534,7 @@ impl SessionStore for InMemorySessionStore {
         }
     }
 
-    fn delete(&self, session_id: &str) -> Result<()> {
+    async fn delete(&self, session_id: &str) -> Result<()> {
         let mut sessions = self
             .sessions
             .write()
@@ -540,7 +543,7 @@ impl SessionStore for InMemorySessionStore {
         Ok(())
     }
 
-    fn get_by_user(&self, user_id: &str) -> Result<Vec<Session>> {
+    async fn get_by_user(&self, user_id: &str) -> Result<Vec<Session>> {
         let sessions = self
             .sessions
             .read()
@@ -553,7 +556,7 @@ impl SessionStore for InMemorySessionStore {
             .collect())
     }
 
-    fn delete_by_user(&self, user_id: &str) -> Result<usize> {
+    async fn delete_by_user(&self, user_id: &str) -> Result<usize> {
         let mut sessions = self
             .sessions
             .write()
@@ -573,7 +576,7 @@ impl SessionStore for InMemorySessionStore {
         Ok(count)
     }
 
-    fn cleanup_expired(&self) -> Result<usize> {
+    async fn cleanup_expired(&self) -> Result<usize> {
         let mut sessions = self
             .sessions
             .write()
@@ -594,7 +597,7 @@ impl SessionStore for InMemorySessionStore {
         Ok(count)
     }
 
-    fn count(&self) -> Result<usize> {
+    async fn count(&self) -> Result<usize> {
         let sessions = self
             .sessions
             .read()
@@ -663,12 +666,12 @@ impl SessionManager {
     /// # 返回
     ///
     /// 返回创建的 Session
-    pub fn create(&self, user_id: impl Into<String>) -> Result<Session> {
+    pub async fn create(&self, user_id: impl Into<String>) -> Result<Session> {
         let user_id = user_id.into();
-        self.enforce_max_sessions(&user_id)?;
+        self.enforce_max_sessions(&user_id).await?;
 
         let session = Session::new(&user_id, self.config.expiration)?;
-        self.store.save(&session)?;
+        self.store.save(&session).await?;
 
         Ok(session)
     }
@@ -676,13 +679,13 @@ impl SessionManager {
     /// 使用选项创建 Session
     ///
     /// 允许设置 User-Agent、IP 地址和初始元数据。
-    pub fn create_with_options(
+    pub async fn create_with_options(
         &self,
         user_id: impl Into<String>,
         options: CreateSessionOptions,
     ) -> Result<Session> {
         let user_id = user_id.into();
-        self.enforce_max_sessions(&user_id)?;
+        self.enforce_max_sessions(&user_id).await?;
 
         let expiration = options.custom_expiration.unwrap_or(self.config.expiration);
 
@@ -694,7 +697,7 @@ impl SessionManager {
             session.metadata = metadata;
         }
 
-        self.store.save(&session)?;
+        self.store.save(&session).await?;
 
         Ok(session)
     }
@@ -702,11 +705,11 @@ impl SessionManager {
     /// 获取 Session
     ///
     /// 如果启用了滑动过期，会自动更新最后访问时间和过期时间。
-    pub fn get(&self, session_id: &str) -> Option<Session> {
-        let session = self.store.get(session_id).ok()??;
+    pub async fn get(&self, session_id: &str) -> Option<Session> {
+        let session = self.store.get(session_id).await.ok()??;
 
         if session.is_expired() {
-            let _ = self.store.delete(session_id);
+            let _ = self.store.delete(session_id).await;
             return None;
         }
 
@@ -715,7 +718,7 @@ impl SessionManager {
             let mut updated = session.clone();
             updated.touch();
             updated.extend(self.config.expiration);
-            let _ = self.store.update(&updated);
+            let _ = self.store.update(&updated).await;
             return Some(updated);
         }
 
@@ -733,7 +736,7 @@ impl SessionManager {
     /// # 返回
     ///
     /// 如果验证成功返回 Session，否则返回错误
-    pub fn validate(
+    pub async fn validate(
         &self,
         session_id: &str,
         ip_address: Option<&str>,
@@ -741,12 +744,13 @@ impl SessionManager {
     ) -> Result<Session> {
         let session = self
             .store
-            .get(session_id)?
+            .get(session_id)
+            .await?
             .ok_or_else(|| Error::Storage(StorageError::NotFound("session".into())))?;
 
         // 检查过期
         if session.is_expired() {
-            self.store.delete(session_id)?;
+            self.store.delete(session_id).await?;
             return Err(Error::validation("session expired"));
         }
 
@@ -770,54 +774,55 @@ impl SessionManager {
     }
 
     /// 更新 Session
-    pub fn update(&self, session: &Session) -> Result<()> {
-        self.store.update(session)
+    pub async fn update(&self, session: &Session) -> Result<()> {
+        self.store.update(session).await
     }
 
     /// 销毁 Session
-    pub fn destroy(&self, session_id: &str) -> Result<()> {
-        self.store.delete(session_id)
+    pub async fn destroy(&self, session_id: &str) -> Result<()> {
+        self.store.delete(session_id).await
     }
 
     /// 销毁用户的所有 Session
     ///
     /// 返回销毁的 Session 数量
-    pub fn destroy_all_for_user(&self, user_id: &str) -> Result<usize> {
-        self.store.delete_by_user(user_id)
+    pub async fn destroy_all_for_user(&self, user_id: &str) -> Result<usize> {
+        self.store.delete_by_user(user_id).await
     }
 
     /// 获取用户的所有 Session
-    pub fn get_user_sessions(&self, user_id: &str) -> Result<Vec<Session>> {
-        self.store.get_by_user(user_id)
+    pub async fn get_user_sessions(&self, user_id: &str) -> Result<Vec<Session>> {
+        self.store.get_by_user(user_id).await
     }
 
     /// 清理过期的 Session
-    pub fn cleanup(&self) -> Result<usize> {
-        self.store.cleanup_expired()
+    pub async fn cleanup(&self) -> Result<usize> {
+        self.store.cleanup_expired().await
     }
 
     /// 获取 Session 总数
-    pub fn count(&self) -> Result<usize> {
-        self.store.count()
+    pub async fn count(&self) -> Result<usize> {
+        self.store.count().await
     }
 
     /// 刷新 Session
     ///
     /// 更新最后访问时间并延长过期时间
-    pub fn refresh(&self, session_id: &str) -> Result<Session> {
+    pub async fn refresh(&self, session_id: &str) -> Result<Session> {
         let mut session = self
             .store
-            .get(session_id)?
+            .get(session_id)
+            .await?
             .ok_or_else(|| Error::Storage(StorageError::NotFound("session".into())))?;
 
         if session.is_expired() {
-            self.store.delete(session_id)?;
+            self.store.delete(session_id).await?;
             return Err(Error::validation("session expired"));
         }
 
         session.touch();
         session.extend(self.config.expiration);
-        self.store.update(&session)?;
+        self.store.update(&session).await?;
 
         Ok(session)
     }
@@ -832,16 +837,16 @@ impl SessionManager {
     // ========================================================================
 
     /// 强制执行单用户最大 Session 数限制
-    fn enforce_max_sessions(&self, user_id: &str) -> Result<()> {
+    async fn enforce_max_sessions(&self, user_id: &str) -> Result<()> {
         if self.config.max_sessions_per_user == 0 {
             return Ok(());
         }
 
-        let sessions = self.store.get_by_user(user_id)?;
+        let sessions = self.store.get_by_user(user_id).await?;
         if sessions.len() >= self.config.max_sessions_per_user {
             // 删除最早创建的 Session
             if let Some(oldest) = sessions.iter().min_by_key(|s| s.created_at) {
-                self.store.delete(&oldest.id)?;
+                self.store.delete(&oldest.id).await?;
             }
         }
 
@@ -986,59 +991,59 @@ mod tests {
         assert_eq!(retrieved, Some(profile));
     }
 
-    #[test]
-    fn test_session_manager_create() {
+    #[tokio::test]
+    async fn test_session_manager_create() {
         let manager = SessionManager::new(SessionConfig::default());
-        let session = manager.create("user123").unwrap();
+        let session = manager.create("user123").await.unwrap();
         assert_eq!(session.user_id, "user123");
     }
 
-    #[test]
-    fn test_session_manager_get() {
+    #[tokio::test]
+    async fn test_session_manager_get() {
         let manager = SessionManager::new(SessionConfig::default());
-        let session = manager.create("user123").unwrap();
+        let session = manager.create("user123").await.unwrap();
 
-        let retrieved = manager.get(&session.id);
+        let retrieved = manager.get(&session.id).await;
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().user_id, "user123");
     }
 
-    #[test]
-    fn test_session_manager_destroy() {
+    #[tokio::test]
+    async fn test_session_manager_destroy() {
         let manager = SessionManager::new(SessionConfig::default());
-        let session = manager.create("user123").unwrap();
+        let session = manager.create("user123").await.unwrap();
 
-        manager.destroy(&session.id).unwrap();
-        assert!(manager.get(&session.id).is_none());
+        manager.destroy(&session.id).await.unwrap();
+        assert!(manager.get(&session.id).await.is_none());
     }
 
-    #[test]
-    fn test_session_manager_destroy_all_for_user() {
+    #[tokio::test]
+    async fn test_session_manager_destroy_all_for_user() {
         let config = SessionConfig::default().with_max_sessions_per_user(0);
         let manager = SessionManager::new(config);
 
-        manager.create("user123").unwrap();
-        manager.create("user123").unwrap();
-        manager.create("user456").unwrap();
+        manager.create("user123").await.unwrap();
+        manager.create("user123").await.unwrap();
+        manager.create("user456").await.unwrap();
 
-        let count = manager.destroy_all_for_user("user123").unwrap();
+        let count = manager.destroy_all_for_user("user123").await.unwrap();
         assert_eq!(count, 2);
 
-        let remaining = manager.get_user_sessions("user123").unwrap();
+        let remaining = manager.get_user_sessions("user123").await.unwrap();
         assert!(remaining.is_empty());
     }
 
-    #[test]
-    fn test_session_manager_max_sessions() {
+    #[tokio::test]
+    async fn test_session_manager_max_sessions() {
         let config = SessionConfig::default().with_max_sessions_per_user(2);
         let manager = SessionManager::new(config);
 
-        let s1 = manager.create("user123").unwrap();
-        let s2 = manager.create("user123").unwrap();
-        let s3 = manager.create("user123").unwrap();
+        let s1 = manager.create("user123").await.unwrap();
+        let s2 = manager.create("user123").await.unwrap();
+        let s3 = manager.create("user123").await.unwrap();
 
         // 应该只有 2 个 session
-        let sessions = manager.get_user_sessions("user123").unwrap();
+        let sessions = manager.get_user_sessions("user123").await.unwrap();
         assert_eq!(sessions.len(), 2);
 
         // 最早的 session 应该被删除（s1）
@@ -1054,26 +1059,26 @@ mod tests {
         assert_eq!(deleted_count, 1);
     }
 
-    #[test]
-    fn test_session_manager_sliding_expiration() {
+    #[tokio::test]
+    async fn test_session_manager_sliding_expiration() {
         let config = SessionConfig::default()
             .with_expiration(Duration::hours(1))
             .with_sliding_expiration(true);
         let manager = SessionManager::new(config);
 
-        let session = manager.create("user123").unwrap();
+        let session = manager.create("user123").await.unwrap();
         let original_expires = session.expires_at;
 
         // 等待一小段时间后获取 session
         std::thread::sleep(std::time::Duration::from_millis(10));
 
-        let retrieved = manager.get(&session.id).unwrap();
+        let retrieved = manager.get(&session.id).await.unwrap();
         // 过期时间应该被更新
         assert!(retrieved.expires_at >= original_expires);
     }
 
-    #[test]
-    fn test_session_manager_validate() {
+    #[tokio::test]
+    async fn test_session_manager_validate() {
         let config = SessionConfig::default()
             .with_ip_validation(true)
             .with_user_agent_validation(true);
@@ -1082,12 +1087,16 @@ mod tests {
         let options = CreateSessionOptions::new()
             .with_ip_address("192.168.1.1")
             .with_user_agent("TestBrowser");
-        let session = manager.create_with_options("user123", options).unwrap();
+        let session = manager
+            .create_with_options("user123", options)
+            .await
+            .unwrap();
 
         // 正确的 IP 和 UA 应该通过验证
         assert!(
             manager
                 .validate(&session.id, Some("192.168.1.1"), Some("TestBrowser"))
+                .await
                 .is_ok()
         );
 
@@ -1095,39 +1104,40 @@ mod tests {
         assert!(
             manager
                 .validate(&session.id, Some("10.0.0.1"), Some("TestBrowser"))
+                .await
                 .is_err()
         );
     }
 
-    #[test]
-    fn test_session_cleanup() {
+    #[tokio::test]
+    async fn test_session_cleanup() {
         let manager = SessionManager::new(SessionConfig::default());
 
         // 创建一个已过期的 session
         let mut session = Session::new("user123", Duration::hours(1)).unwrap();
         session.expires_at = Utc::now().timestamp() - 100;
-        manager.store.save(&session).unwrap();
+        manager.store.save(&session).await.unwrap();
 
         // 创建一个有效的 session
-        manager.create("user456").unwrap();
+        manager.create("user456").await.unwrap();
 
-        let cleaned = manager.cleanup().unwrap();
+        let cleaned = manager.cleanup().await.unwrap();
         assert_eq!(cleaned, 1);
-        assert_eq!(manager.count().unwrap(), 1);
+        assert_eq!(manager.count().await.unwrap(), 1);
     }
 
-    #[test]
-    fn test_in_memory_store() {
+    #[tokio::test]
+    async fn test_in_memory_store() {
         let store = InMemorySessionStore::new();
 
         let session = Session::new("user123", Duration::hours(1)).unwrap();
-        store.save(&session).unwrap();
+        store.save(&session).await.unwrap();
 
-        let retrieved = store.get(&session.id).unwrap();
+        let retrieved = store.get(&session.id).await.unwrap();
         assert!(retrieved.is_some());
 
-        store.delete(&session.id).unwrap();
-        let retrieved = store.get(&session.id).unwrap();
+        store.delete(&session.id).await.unwrap();
+        let retrieved = store.get(&session.id).await.unwrap();
         assert!(retrieved.is_none());
     }
 
@@ -1172,14 +1182,14 @@ mod tests {
         assert!(long.sliding_expiration);
     }
 
-    #[test]
-    fn test_refresh_session() {
+    #[tokio::test]
+    async fn test_refresh_session() {
         let manager = SessionManager::new(SessionConfig::default());
-        let session = manager.create("user123").unwrap();
+        let session = manager.create("user123").await.unwrap();
 
         std::thread::sleep(std::time::Duration::from_millis(10));
 
-        let refreshed = manager.refresh(&session.id).unwrap();
+        let refreshed = manager.refresh(&session.id).await.unwrap();
         assert!(refreshed.last_accessed_at >= session.last_accessed_at);
     }
 

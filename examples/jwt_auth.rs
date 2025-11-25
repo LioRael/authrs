@@ -51,7 +51,7 @@ impl JwtAuthService {
     }
 
     /// 用户登录，返回 JWT 和 Refresh Token
-    fn login(&self, username: &str, password: &str) -> Result<TokenPair, String> {
+    async fn login(&self, username: &str, password: &str) -> Result<TokenPair, String> {
         // 1. 验证用户凭证
         let user = UserService::authenticate(username, password)
             .ok_or_else(|| "用户名或密码错误".to_string())?;
@@ -71,6 +71,7 @@ impl JwtAuthService {
         let refresh_token = self
             .refresh_manager
             .generate(&user.user_id)
+            .await
             .map_err(|e| format!("Refresh Token 创建失败: {}", e))?;
 
         println!("✅ 登录成功: {}", user.username);
@@ -117,10 +118,11 @@ impl JwtAuthService {
     }
 
     /// 使用 Refresh Token 获取新的 Access Token
-    fn refresh(&self, refresh_token: &str) -> Result<RefreshResult, String> {
+    async fn refresh(&self, refresh_token: &str) -> Result<RefreshResult, String> {
         let result = self
             .refresh_manager
             .use_token(refresh_token)
+            .await
             .map_err(|e| format!("Refresh Token 使用失败: {}", e))?;
 
         // TokenUseResult 是一个结构体
@@ -160,14 +162,15 @@ struct RefreshResult {
     user_id: String,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     println!("=== AuthRS JWT 认证示例 ===\n");
 
     let auth_service = JwtAuthService::new();
 
     // 1. 用户登录
     println!("🔐 用户登录...");
-    let tokens = match auth_service.login("alice", "password123") {
+    let tokens = match auth_service.login("alice", "password123").await {
         Ok(t) => {
             println!("   用户 ID: {}", t.user_id);
             println!("   Access Token: {}...", &t.access_token[..50]);
@@ -203,7 +206,7 @@ fn main() {
 
     // 4. 使用 Refresh Token 获取新的 Access Token
     println!("🔄 刷新 Token...");
-    match auth_service.refresh(&tokens.refresh_token) {
+    match auth_service.refresh(&tokens.refresh_token).await {
         Ok(result) => {
             println!("   ✅ Token 刷新成功");
             println!("   新 Access Token: {}...", &result.access_token[..50]);
@@ -230,7 +233,7 @@ fn main() {
 
     // 5. 尝试重用旧的 Refresh Token
     println!("🔄 尝试重用旧的 Refresh Token...");
-    match auth_service.refresh(&tokens.refresh_token) {
+    match auth_service.refresh(&tokens.refresh_token).await {
         Ok(_) => println!("   Token 刷新成功\n"),
         Err(e) => println!("   ❌ {}\n", e),
     }

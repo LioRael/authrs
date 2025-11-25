@@ -42,6 +42,7 @@
 //!     .with_max_active_per_user(3);    // 每用户最多 3 个活跃 token
 //! ```
 
+use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -193,24 +194,25 @@ struct StoredToken {
 /// Magic Link 存储接口
 ///
 /// 实现此 trait 以提供自定义的存储后端（如 Redis、数据库等）
+#[async_trait]
 pub trait MagicLinkStore: Send + Sync {
     /// 保存 token
-    fn save(&self, token: &str, identifier: &str, expires_at: DateTime<Utc>) -> Result<()>;
+    async fn save(&self, token: &str, identifier: &str, expires_at: DateTime<Utc>) -> Result<()>;
 
     /// 获取 token 对应的用户标识
-    fn get(&self, token: &str) -> Result<Option<(String, DateTime<Utc>)>>;
+    async fn get(&self, token: &str) -> Result<Option<(String, DateTime<Utc>)>>;
 
     /// 删除 token
-    fn delete(&self, token: &str) -> Result<()>;
+    async fn delete(&self, token: &str) -> Result<()>;
 
     /// 获取用户的所有活跃 token
-    fn get_user_tokens(&self, identifier: &str) -> Result<Vec<String>>;
+    async fn get_user_tokens(&self, identifier: &str) -> Result<Vec<String>>;
 
     /// 删除用户最旧的 token
-    fn delete_oldest_user_token(&self, identifier: &str) -> Result<()>;
+    async fn delete_oldest_user_token(&self, identifier: &str) -> Result<()>;
 
     /// 清理过期的 token
-    fn cleanup_expired(&self) -> Result<usize>;
+    async fn cleanup_expired(&self) -> Result<usize>;
 }
 
 // ============================================================================
@@ -244,8 +246,9 @@ impl InMemoryMagicLinkStore {
     }
 }
 
+#[async_trait]
 impl MagicLinkStore for InMemoryMagicLinkStore {
-    fn save(&self, token: &str, identifier: &str, expires_at: DateTime<Utc>) -> Result<()> {
+    async fn save(&self, token: &str, identifier: &str, expires_at: DateTime<Utc>) -> Result<()> {
         let mut tokens = self.tokens.write().unwrap();
         tokens.insert(
             token.to_string(),
@@ -258,20 +261,20 @@ impl MagicLinkStore for InMemoryMagicLinkStore {
         Ok(())
     }
 
-    fn get(&self, token: &str) -> Result<Option<(String, DateTime<Utc>)>> {
+    async fn get(&self, token: &str) -> Result<Option<(String, DateTime<Utc>)>> {
         let tokens = self.tokens.read().unwrap();
         Ok(tokens
             .get(token)
             .map(|record| (record.identifier.clone(), record.expires_at)))
     }
 
-    fn delete(&self, token: &str) -> Result<()> {
+    async fn delete(&self, token: &str) -> Result<()> {
         let mut tokens = self.tokens.write().unwrap();
         tokens.remove(token);
         Ok(())
     }
 
-    fn get_user_tokens(&self, identifier: &str) -> Result<Vec<String>> {
+    async fn get_user_tokens(&self, identifier: &str) -> Result<Vec<String>> {
         let tokens = self.tokens.read().unwrap();
         let user_tokens: Vec<String> = tokens
             .iter()
@@ -281,7 +284,7 @@ impl MagicLinkStore for InMemoryMagicLinkStore {
         Ok(user_tokens)
     }
 
-    fn delete_oldest_user_token(&self, identifier: &str) -> Result<()> {
+    async fn delete_oldest_user_token(&self, identifier: &str) -> Result<()> {
         let mut tokens = self.tokens.write().unwrap();
 
         // 找到该用户最旧的 token
@@ -298,7 +301,7 @@ impl MagicLinkStore for InMemoryMagicLinkStore {
         Ok(())
     }
 
-    fn cleanup_expired(&self) -> Result<usize> {
+    async fn cleanup_expired(&self) -> Result<usize> {
         let mut tokens = self.tokens.write().unwrap();
         let now = Utc::now();
         let before = tokens.len();
@@ -376,14 +379,14 @@ impl<S: MagicLinkStore> MagicLinkManager<S> {
     /// // 构建完整 URL
     /// let url = format!("https://example.com/login?token={}", data.token);
     /// ```
-    pub fn generate(&self, identifier: impl Into<String>) -> Result<MagicLinkData> {
+    pub async fn generate(&self, identifier: impl Into<String>) -> Result<MagicLinkData> {
         let identifier = identifier.into();
 
         // 检查并限制用户的活跃 token 数量
-        let user_tokens = self.store.get_user_tokens(&identifier)?;
+        let user_tokens = self.store.get_user_tokens(&identifier).await?;
         if user_tokens.len() >= self.config.max_active_per_user {
             // 删除最旧的 token
-            self.store.delete_oldest_user_token(&identifier)?;
+            self.store.delete_oldest_user_token(&identifier).await?;
         }
 
         // 生成安全的随机 token
@@ -394,7 +397,7 @@ impl<S: MagicLinkStore> MagicLinkManager<S> {
         let expires_at = created_at + Duration::seconds(self.config.ttl.as_secs() as i64);
 
         // 保存 token
-        self.store.save(&token, &identifier, expires_at)?;
+        self.store.save(&token, &identifier, expires_at).await?;
 
         Ok(MagicLinkData {
             token,
@@ -436,23 +439,24 @@ impl<S: MagicLinkStore> MagicLinkManager<S> {
     /// // token 已被消费，再次验证会失败
     /// assert!(manager.verify(&data.token).is_err());
     /// ```
-    pub fn verify(&self, token: &str) -> Result<String> {
+    pub async fn verify(&self, token: &str) -> Result<String> {
         // 获取 token 记录
         let (identifier, expires_at) = self
             .store
-            .get(token)?
+            .get(token)
+            .await?
             .ok_or_else(|| Error::validation("invalid or expired magic link token"))?;
 
         // 检查是否过期
         if Utc::now() > expires_at {
             // 清理过期的 token
-            self.store.delete(token)?;
+            self.store.delete(token).await?;
             return Err(Error::validation("magic link token has expired"));
         }
 
         // 根据配置决定是否消费 token
         if self.config.consume_on_verify {
-            self.store.delete(token)?;
+            self.store.delete(token).await?;
         }
 
         Ok(identifier)
@@ -461,18 +465,18 @@ impl<S: MagicLinkStore> MagicLinkManager<S> {
     /// 撤销 token
     ///
     /// 手动使 token 失效。
-    pub fn revoke(&self, token: &str) -> Result<()> {
-        self.store.delete(token)
+    pub async fn revoke(&self, token: &str) -> Result<()> {
+        self.store.delete(token).await
     }
 
     /// 撤销用户的所有 token
     ///
     /// 当用户请求登出所有设备或更改密码时使用。
-    pub fn revoke_all_for_user(&self, identifier: &str) -> Result<usize> {
-        let tokens = self.store.get_user_tokens(identifier)?;
+    pub async fn revoke_all_for_user(&self, identifier: &str) -> Result<usize> {
+        let tokens = self.store.get_user_tokens(identifier).await?;
         let count = tokens.len();
         for token in tokens {
-            self.store.delete(&token)?;
+            self.store.delete(&token).await?;
         }
         Ok(count)
     }
@@ -480,8 +484,8 @@ impl<S: MagicLinkStore> MagicLinkManager<S> {
     /// 清理过期的 token
     ///
     /// 建议定期调用此方法以清理存储。
-    pub fn cleanup(&self) -> Result<usize> {
-        self.store.cleanup_expired()
+    pub async fn cleanup(&self) -> Result<usize> {
+        self.store.cleanup_expired().await
     }
 
     /// 获取配置
@@ -496,52 +500,52 @@ mod tests {
     use std::thread::sleep;
     use std::time::Duration as StdDuration;
 
-    #[test]
-    fn test_generate_and_verify() {
+    #[tokio::test]
+    async fn test_generate_and_verify() {
         let manager = MagicLinkManager::new(MagicLinkConfig::default());
 
-        let data = manager.generate("test@example.com").unwrap();
+        let data = manager.generate("test@example.com").await.unwrap();
         assert!(!data.token.is_empty());
         assert_eq!(data.identifier, "test@example.com");
         assert!(!data.is_expired());
 
         // 验证成功
-        let email = manager.verify(&data.token).unwrap();
+        let email = manager.verify(&data.token).await.unwrap();
         assert_eq!(email, "test@example.com");
     }
 
-    #[test]
-    fn test_token_consumed_after_verify() {
+    #[tokio::test]
+    async fn test_token_consumed_after_verify() {
         let manager = MagicLinkManager::new(MagicLinkConfig::default());
 
-        let data = manager.generate("test@example.com").unwrap();
+        let data = manager.generate("test@example.com").await.unwrap();
 
         // 第一次验证成功
-        assert!(manager.verify(&data.token).is_ok());
+        assert!(manager.verify(&data.token).await.is_ok());
 
         // 第二次验证失败（已消费）
-        assert!(manager.verify(&data.token).is_err());
+        assert!(manager.verify(&data.token).await.is_err());
     }
 
-    #[test]
-    fn test_token_not_consumed_when_disabled() {
+    #[tokio::test]
+    async fn test_token_not_consumed_when_disabled() {
         let config = MagicLinkConfig::default().with_consume_on_verify(false);
         let manager = MagicLinkManager::new(config);
 
-        let data = manager.generate("test@example.com").unwrap();
+        let data = manager.generate("test@example.com").await.unwrap();
 
         // 多次验证都成功
-        assert!(manager.verify(&data.token).is_ok());
-        assert!(manager.verify(&data.token).is_ok());
-        assert!(manager.verify(&data.token).is_ok());
+        assert!(manager.verify(&data.token).await.is_ok());
+        assert!(manager.verify(&data.token).await.is_ok());
+        assert!(manager.verify(&data.token).await.is_ok());
     }
 
-    #[test]
-    fn test_token_expiration() {
+    #[tokio::test]
+    async fn test_token_expiration() {
         let config = MagicLinkConfig::default().with_ttl(StdDuration::from_secs(1));
         let manager = MagicLinkManager::new(config);
 
-        let data = manager.generate("test@example.com").unwrap();
+        let data = manager.generate("test@example.com").await.unwrap();
 
         // 立即验证成功（在过期前）
         assert!(!data.is_expired());
@@ -550,105 +554,108 @@ mod tests {
         sleep(StdDuration::from_millis(1100));
 
         // 验证失败（已过期）
-        assert!(manager.verify(&data.token).is_err());
+        assert!(manager.verify(&data.token).await.is_err());
     }
 
-    #[test]
-    fn test_max_active_tokens_per_user() {
+    #[tokio::test]
+    async fn test_max_active_tokens_per_user() {
         let config = MagicLinkConfig::default().with_max_active_per_user(2);
         let manager = MagicLinkManager::new(config);
 
-        let token1 = manager.generate("user@example.com").unwrap();
-        let token2 = manager.generate("user@example.com").unwrap();
-        let token3 = manager.generate("user@example.com").unwrap();
+        let token1 = manager.generate("user@example.com").await.unwrap();
+        let token2 = manager.generate("user@example.com").await.unwrap();
+        let token3 = manager.generate("user@example.com").await.unwrap();
 
         // token1 应该被删除了
-        assert!(manager.verify(&token1.token).is_err());
+        assert!(manager.verify(&token1.token).await.is_err());
 
         // token2 和 token3 仍然有效
-        assert!(manager.verify(&token2.token).is_ok());
-        assert!(manager.verify(&token3.token).is_ok());
+        assert!(manager.verify(&token2.token).await.is_ok());
+        assert!(manager.verify(&token3.token).await.is_ok());
     }
 
-    #[test]
-    fn test_revoke_token() {
+    #[tokio::test]
+    async fn test_revoke_token() {
         let manager = MagicLinkManager::new(MagicLinkConfig::default());
 
-        let data = manager.generate("test@example.com").unwrap();
+        let data = manager.generate("test@example.com").await.unwrap();
 
         // 撤销 token
-        manager.revoke(&data.token).unwrap();
+        manager.revoke(&data.token).await.unwrap();
 
         // 验证失败
-        assert!(manager.verify(&data.token).is_err());
+        assert!(manager.verify(&data.token).await.is_err());
     }
 
-    #[test]
-    fn test_revoke_all_for_user() {
+    #[tokio::test]
+    async fn test_revoke_all_for_user() {
         let config = MagicLinkConfig::default()
             .with_max_active_per_user(10)
             .with_consume_on_verify(false);
         let manager = MagicLinkManager::new(config);
 
         // 生成多个 token
-        let t1 = manager.generate("user@example.com").unwrap();
-        let t2 = manager.generate("user@example.com").unwrap();
-        let t3 = manager.generate("other@example.com").unwrap();
+        let t1 = manager.generate("user@example.com").await.unwrap();
+        let t2 = manager.generate("user@example.com").await.unwrap();
+        let t3 = manager.generate("other@example.com").await.unwrap();
 
         // 撤销 user@example.com 的所有 token
-        let count = manager.revoke_all_for_user("user@example.com").unwrap();
+        let count = manager
+            .revoke_all_for_user("user@example.com")
+            .await
+            .unwrap();
         assert_eq!(count, 2);
 
         // user@example.com 的 token 都失效了
-        assert!(manager.verify(&t1.token).is_err());
-        assert!(manager.verify(&t2.token).is_err());
+        assert!(manager.verify(&t1.token).await.is_err());
+        assert!(manager.verify(&t2.token).await.is_err());
 
         // other@example.com 的 token 仍然有效
-        assert!(manager.verify(&t3.token).is_ok());
+        assert!(manager.verify(&t3.token).await.is_ok());
     }
 
-    #[test]
-    fn test_cleanup_expired() {
+    #[tokio::test]
+    async fn test_cleanup_expired() {
         let config = MagicLinkConfig::default()
             .with_ttl(StdDuration::from_secs(1))
             .with_max_active_per_user(10);
         let manager = MagicLinkManager::new(config);
 
         // 生成一些 token
-        manager.generate("user1@example.com").unwrap();
-        manager.generate("user2@example.com").unwrap();
-        manager.generate("user3@example.com").unwrap();
+        manager.generate("user1@example.com").await.unwrap();
+        manager.generate("user2@example.com").await.unwrap();
+        manager.generate("user3@example.com").await.unwrap();
 
         // 等待过期
         sleep(StdDuration::from_millis(1100));
 
         // 清理
-        let cleaned = manager.cleanup().unwrap();
+        let cleaned = manager.cleanup().await.unwrap();
         assert_eq!(cleaned, 3);
     }
 
-    #[test]
-    fn test_different_users_independent() {
+    #[tokio::test]
+    async fn test_different_users_independent() {
         let manager = MagicLinkManager::new(MagicLinkConfig::default());
 
-        let data1 = manager.generate("user1@example.com").unwrap();
-        let data2 = manager.generate("user2@example.com").unwrap();
+        let data1 = manager.generate("user1@example.com").await.unwrap();
+        let data2 = manager.generate("user2@example.com").await.unwrap();
 
         // 验证 user1 的 token
-        let email1 = manager.verify(&data1.token).unwrap();
+        let email1 = manager.verify(&data1.token).await.unwrap();
         assert_eq!(email1, "user1@example.com");
 
         // user2 的 token 仍然有效
-        let email2 = manager.verify(&data2.token).unwrap();
+        let email2 = manager.verify(&data2.token).await.unwrap();
         assert_eq!(email2, "user2@example.com");
     }
 
-    #[test]
-    fn test_remaining_seconds() {
+    #[tokio::test]
+    async fn test_remaining_seconds() {
         let config = MagicLinkConfig::default().with_ttl(StdDuration::from_secs(300));
         let manager = MagicLinkManager::new(config);
 
-        let data = manager.generate("test@example.com").unwrap();
+        let data = manager.generate("test@example.com").await.unwrap();
 
         // 剩余时间应该接近 300 秒
         let remaining = data.remaining_seconds();
@@ -671,16 +678,16 @@ mod tests {
         assert_eq!(config.max_active_per_user, 10);
     }
 
-    #[test]
-    fn test_invalid_token() {
+    #[tokio::test]
+    async fn test_invalid_token() {
         let manager = MagicLinkManager::new(MagicLinkConfig::default());
 
         // 验证不存在的 token
-        assert!(manager.verify("invalid-token").is_err());
+        assert!(manager.verify("invalid-token").await.is_err());
     }
 
-    #[test]
-    fn test_store_len_and_is_empty() {
+    #[tokio::test]
+    async fn test_store_len_and_is_empty() {
         let store = InMemoryMagicLinkStore::new();
         assert!(store.is_empty());
         assert_eq!(store.len(), 0);
@@ -691,6 +698,7 @@ mod tests {
                 "user@example.com",
                 Utc::now() + Duration::hours(1),
             )
+            .await
             .unwrap();
         assert!(!store.is_empty());
         assert_eq!(store.len(), 1);

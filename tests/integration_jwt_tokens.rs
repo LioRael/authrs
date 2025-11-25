@@ -88,8 +88,8 @@ fn test_jwt_with_claims() {
 }
 
 /// 测试 Refresh Token 管理
-#[test]
-fn test_refresh_token_manager() {
+#[tokio::test]
+async fn test_refresh_token_manager() {
     let config = RefreshConfig::new();
 
     let manager = RefreshTokenManager::new(config);
@@ -98,6 +98,7 @@ fn test_refresh_token_manager() {
     // 1. 生成 Refresh Token
     let token = manager
         .generate(user_id)
+        .await
         .expect("Token generation should succeed");
     assert!(!token.token.is_empty());
     assert_eq!(token.user_id, user_id);
@@ -105,6 +106,7 @@ fn test_refresh_token_manager() {
     // 2. 使用 Token
     let result = manager
         .use_token(&token.token)
+        .await
         .expect("Token use should succeed");
 
     // TokenUseResult 是一个结构体
@@ -112,23 +114,23 @@ fn test_refresh_token_manager() {
 }
 
 /// 测试 Refresh Token 基本功能
-#[test]
-fn test_refresh_token_basic() {
+#[tokio::test]
+async fn test_refresh_token_basic() {
     let config = RefreshConfig::new();
     let manager = RefreshTokenManager::new(config);
 
     // 生成 Token
-    let token = manager.generate("user_123").unwrap();
+    let token = manager.generate("user_123").await.unwrap();
     assert!(!token.token.is_empty());
 
     // Token 刚生成应该有效
-    let result = manager.use_token(&token.token);
+    let result = manager.use_token(&token.token).await;
     assert!(result.is_ok(), "Fresh token should be valid");
 }
 
 /// 测试 Session 管理
-#[test]
-fn test_session_management() {
+#[tokio::test]
+async fn test_session_management() {
     let session_manager = SessionManager::new(SessionConfig::default());
 
     let user_id = "user_123";
@@ -136,17 +138,18 @@ fn test_session_management() {
     // 1. 创建 Session
     let session = session_manager
         .create(user_id)
+        .await
         .expect("Session creation should succeed");
     assert!(!session.id.is_empty());
     assert_eq!(session.user_id, user_id);
 
     // 2. 获取 Session
-    let retrieved = session_manager.get(&session.id);
+    let retrieved = session_manager.get(&session.id).await;
     assert!(retrieved.is_some(), "Session should exist");
     assert_eq!(retrieved.unwrap().user_id, user_id);
 
     // 3. 销毁 Session
-    session_manager.destroy(&session.id).unwrap();
-    let after_destroy = session_manager.get(&session.id);
+    session_manager.destroy(&session.id).await.unwrap();
+    let after_destroy = session_manager.get(&session.id).await;
     assert!(after_destroy.is_none(), "Session should be destroyed");
 }

@@ -111,8 +111,8 @@ fn test_login_flow_with_security() {
 }
 
 /// 测试 Session 管理流程
-#[test]
-fn test_session_management_flow() {
+#[tokio::test]
+async fn test_session_management_flow() {
     let config = SessionConfig::new()
         .with_max_sessions_per_user(3)
         .with_expiration(chrono::Duration::hours(24));
@@ -123,38 +123,39 @@ fn test_session_management_flow() {
     // 1. 创建 Session
     let session = manager
         .create(user_id)
+        .await
         .expect("Session creation should succeed");
     assert_eq!(session.user_id, user_id);
     assert!(!session.id.is_empty());
 
     // 2. 验证 Session
-    let retrieved = manager.get(&session.id);
+    let retrieved = manager.get(&session.id).await;
     assert!(retrieved.is_some(), "Session should exist");
     assert_eq!(retrieved.unwrap().user_id, user_id);
 
     // 3. 列出用户的所有 Session
-    let sessions = manager.get_user_sessions(user_id).unwrap();
+    let sessions = manager.get_user_sessions(user_id).await.unwrap();
     assert_eq!(sessions.len(), 1, "User should have exactly one session");
 
     // 4. 创建多个 Session
-    let _session2 = manager.create(user_id).unwrap();
-    let _session3 = manager.create(user_id).unwrap();
-    let sessions = manager.get_user_sessions(user_id).unwrap();
-    assert_eq!(sessions.len(), 3, "User should have 3 sessions");
+    let _session2 = manager.create(user_id).await.unwrap();
+    let _session3 = manager.create(user_id).await.unwrap();
+    let sessions = manager.get_user_sessions(user_id).await.unwrap();
+    assert_eq!(sessions.len(), 3, "User should have exactly three sessions");
 
     // 5. 超过限制时最旧的 Session 被移除
-    let _session4 = manager.create(user_id).unwrap();
-    let sessions = manager.get_user_sessions(user_id).unwrap();
+    let _session4 = manager.create(user_id).await.unwrap();
+    let sessions = manager.get_user_sessions(user_id).await.unwrap();
     assert_eq!(sessions.len(), 3, "Max sessions should be enforced");
 
     // 6. 销毁单个 Session
-    let destroy_result = manager.destroy(&session.id);
+    let destroy_result = manager.destroy(&session.id).await;
     assert!(destroy_result.is_ok(), "Destroy should succeed");
-    let retrieved = manager.get(&session.id);
+    let retrieved = manager.get(&session.id).await;
     assert!(retrieved.is_none(), "Destroyed session should not exist");
 
     // 7. 销毁用户所有 Session
-    let count = manager.destroy_all_for_user(user_id).unwrap();
+    let count = manager.destroy_all_for_user(user_id).await.unwrap();
     assert!(count >= 2, "Should destroy remaining sessions");
 }
 
@@ -183,8 +184,8 @@ fn test_csrf_protection_flow() {
 }
 
 /// 测试完整的认证生命周期
-#[test]
-fn test_complete_auth_lifecycle() {
+#[tokio::test]
+async fn test_complete_auth_lifecycle() {
     // === 阶段1：注册 ===
     let username = "alice";
     let password = "AliceSecure#2024";
@@ -220,7 +221,7 @@ fn test_complete_auth_lifecycle() {
     login_tracker.record_successful_login(&user.id, None);
 
     // 创建 Session
-    let session = session_manager.create(&user.id).unwrap();
+    let session = session_manager.create(&user.id).await.unwrap();
 
     // 生成 CSRF Token
     let csrf_token = csrf.generate_token().unwrap();
@@ -229,7 +230,7 @@ fn test_complete_auth_lifecycle() {
 
     // 验证 Session
     let active_session = session_manager.get(&session.id);
-    assert!(active_session.is_some());
+    assert!(active_session.await.is_some());
 
     // 验证 CSRF Token（例如：表单提交）
     let csrf_valid = csrf.verify(&csrf_token.token).unwrap();
@@ -239,11 +240,11 @@ fn test_complete_auth_lifecycle() {
 
     // === 阶段4：登出 ===
     let destroy_result = session_manager.destroy(&session.id);
-    assert!(destroy_result.is_ok());
+    assert!(destroy_result.await.is_ok());
 
     // 验证 Session 已失效
     let logged_out = session_manager.get(&session.id);
-    assert!(logged_out.is_none());
+    assert!(logged_out.await.is_none());
 }
 
 /// 测试密码变更流程

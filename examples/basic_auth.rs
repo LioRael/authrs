@@ -33,7 +33,7 @@ impl UserStore {
         }
     }
 
-    fn register(&mut self, username: &str, password: &str) -> Result<&User, String> {
+    async fn register(&mut self, username: &str, password: &str) -> Result<&User, String> {
         // 1. 检查用户名是否已存在
         if self.users.contains_key(username) {
             return Err("用户名已存在".to_string());
@@ -57,7 +57,7 @@ impl UserStore {
         Ok(self.users.get(username).unwrap())
     }
 
-    fn find_by_username(&self, username: &str) -> Option<&User> {
+    async fn find_by_username(&self, username: &str) -> Option<&User> {
         self.users.get(username)
     }
 }
@@ -81,14 +81,14 @@ impl AuthService {
     }
 
     /// 用户注册
-    fn register(&mut self, username: &str, password: &str) -> Result<String, String> {
-        let user = self.user_store.register(username, password)?;
+    async fn register(&mut self, username: &str, password: &str) -> Result<String, String> {
+        let user = self.user_store.register(username, password).await?;
         println!("✅ 用户注册成功: {} (ID: {})", user.username, user.id);
         Ok(user.id.clone())
     }
 
     /// 用户登录
-    fn login(
+    async fn login(
         &mut self,
         username: &str,
         password: &str,
@@ -112,7 +112,7 @@ impl AuthService {
         }
 
         // 2. 查找用户
-        let user = match self.user_store.find_by_username(username) {
+        let user = match self.user_store.find_by_username(username).await {
             Some(u) => u,
             None => {
                 self.login_tracker.record_failed_attempt(username, ip);
@@ -136,6 +136,7 @@ impl AuthService {
         let session = self
             .session_manager
             .create(&user.id)
+            .await
             .map_err(|e| format!("Session 创建失败: {}", e))?;
 
         println!("✅ 登录成功: {} -> Session ID: {}", username, session.id);
@@ -143,15 +144,16 @@ impl AuthService {
     }
 
     /// 验证 Session
-    fn validate_session(&self, session_id: &str) -> Option<String> {
+    async fn validate_session(&self, session_id: &str) -> Option<String> {
         self.session_manager
             .get(session_id)
+            .await
             .map(|s| s.user_id.clone())
     }
 
     /// 登出
-    fn logout(&self, session_id: &str) -> bool {
-        let result = self.session_manager.destroy(session_id);
+    async fn logout(&self, session_id: &str) -> bool {
+        let result = self.session_manager.destroy(session_id).await;
         if result.is_ok() {
             println!("✅ 登出成功: Session {}", session_id);
         }
@@ -159,32 +161,36 @@ impl AuthService {
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     println!("=== AuthRS 基本认证示例 ===\n");
 
     let mut auth = AuthService::new();
 
     // 1. 注册用户
     println!("📝 注册用户...");
-    match auth.register("alice", "AliceSecure#2024!") {
+    match auth.register("alice", "AliceSecure#2024!").await {
         Ok(id) => println!("   用户 ID: {}\n", id),
         Err(e) => println!("   注册失败: {}\n", e),
     }
 
     // 2. 尝试使用弱密码注册
     println!("📝 尝试使用弱密码注册...");
-    match auth.register("bob", "weak") {
+    match auth.register("bob", "weak").await {
         Ok(_) => println!("   注册成功\n"),
         Err(e) => println!("   ❌ {}\n", e),
     }
 
     // 3. 登录
     println!("🔐 登录...");
-    let session_id = match auth.login(
-        "alice",
-        "AliceSecure#2024!",
-        Some(IpAddr::from_str("192.168.1.100").unwrap()),
-    ) {
+    let session_id = match auth
+        .login(
+            "alice",
+            "AliceSecure#2024!",
+            Some(IpAddr::from_str("192.168.1.100").unwrap()),
+        )
+        .await
+    {
         Ok(sid) => {
             println!("   Session: {}\n", sid);
             sid
@@ -197,7 +203,7 @@ fn main() {
 
     // 4. 验证 Session
     println!("🔍 验证 Session...");
-    match auth.validate_session(&session_id) {
+    match auth.validate_session(&session_id).await {
         Some(user_id) => println!("   ✅ Session 有效, 用户: {}\n", user_id),
         None => println!("   ❌ Session 无效\n"),
     }
@@ -205,11 +211,14 @@ fn main() {
     // 5. 尝试错误密码登录
     println!("🔐 尝试错误密码登录...");
     for i in 1..=3 {
-        match auth.login(
-            "alice",
-            "wrong_password",
-            Some(IpAddr::from_str("192.168.1.200").unwrap()),
-        ) {
+        match auth
+            .login(
+                "alice",
+                "wrong_password",
+                Some(IpAddr::from_str("192.168.1.200").unwrap()),
+            )
+            .await
+        {
             Ok(_) => println!("   登录成功"),
             Err(e) => println!("   尝试 {}: {}", i, e),
         }
@@ -222,7 +231,7 @@ fn main() {
 
     // 7. 登出后验证 Session
     println!("\n🔍 登出后验证 Session...");
-    match auth.validate_session(&session_id) {
+    match auth.validate_session(&session_id).await {
         Some(_) => println!("   Session 仍然有效"),
         None => println!("   ✅ Session 已失效"),
     }
