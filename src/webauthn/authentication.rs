@@ -3,7 +3,9 @@
 //! 提供 Passkey 凭证认证的完整流程支持。
 
 use std::collections::HashMap;
+use std::sync::RwLock;
 
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use webauthn_rs::prelude::*;
@@ -292,25 +294,26 @@ impl<'a> AuthenticationManager<'a> {
 /// 认证状态存储 Trait
 ///
 /// 用于在认证流程中保存临时状态
-pub trait AuthenticationStateStore {
+#[async_trait]
+pub trait AuthenticationStateStore: Send + Sync {
     /// 保存认证状态
-    fn save_state(
-        &mut self,
+    async fn save_state(
+        &self,
         session_id: &str,
         state: AuthenticationState,
     ) -> Result<(), AuthenticationError>;
 
     /// 获取并移除认证状态
-    fn take_state(&mut self, session_id: &str) -> Option<AuthenticationState>;
+    async fn take_state(&self, session_id: &str) -> Option<AuthenticationState>;
 
     /// 清理过期状态
-    fn cleanup_expired(&mut self);
+    async fn cleanup_expired(&self);
 }
 
 /// 内存认证状态存储
 #[derive(Debug, Default)]
 pub struct InMemoryAuthenticationStateStore {
-    states: HashMap<String, AuthenticationState>,
+    states: RwLock<HashMap<String, AuthenticationState>>,
 }
 
 impl InMemoryAuthenticationStateStore {
@@ -320,22 +323,30 @@ impl InMemoryAuthenticationStateStore {
     }
 }
 
+#[async_trait]
 impl AuthenticationStateStore for InMemoryAuthenticationStateStore {
-    fn save_state(
-        &mut self,
+    async fn save_state(
+        &self,
         session_id: &str,
         state: AuthenticationState,
     ) -> Result<(), AuthenticationError> {
-        self.states.insert(session_id.to_string(), state);
+        if let Ok(mut states) = self.states.write() {
+            states.insert(session_id.to_string(), state);
+        }
         Ok(())
     }
 
-    fn take_state(&mut self, session_id: &str) -> Option<AuthenticationState> {
-        self.states.remove(session_id)
+    async fn take_state(&self, session_id: &str) -> Option<AuthenticationState> {
+        self.states
+            .write()
+            .ok()
+            .and_then(|mut states| states.remove(session_id))
     }
 
-    fn cleanup_expired(&mut self) {
-        self.states.retain(|_, state| !state.is_expired());
+    async fn cleanup_expired(&self) {
+        if let Ok(mut states) = self.states.write() {
+            states.retain(|_, state| !state.is_expired());
+        }
     }
 }
 
@@ -456,12 +467,12 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_in_memory_authentication_state_store() {
-        let mut store = InMemoryAuthenticationStateStore::new();
+    #[tokio::test]
+    async fn test_in_memory_authentication_state_store() {
+        let store = InMemoryAuthenticationStateStore::new();
 
         // 测试获取不存在的状态
-        assert!(store.take_state("nonexistent").is_none());
+        assert!(store.take_state("nonexistent").await.is_none());
     }
 
     #[test]
