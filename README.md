@@ -3,17 +3,21 @@
 [中文版 README](README.zh-CN.md)
 
 ## Overview
-AuthRS is a Rust 2024 authentication toolkit that consolidates password hashing, JWT/session tokens, MFA, passwordless (Magic Link / OTP), CSRF, rate limiting, and secure randomness utilities so you can assemble robust auth flows without re-implementing primitives.
+AuthRS is a Rust 2024 authentication toolkit that consolidates password hashing, JWT/session tokens, MFA, passwordless (Magic Link / OTP), OAuth2 clients, RBAC, WebAuthn/Passkeys, CSRF, rate limiting, and secure randomness utilities so you can assemble robust auth flows without re-implementing primitives.
 
 ## Features
 - Password hashing and strength validation (Argon2, bcrypt, scrypt, policy helpers)
 - Secure random generators and constant-time comparison helpers
 - JWT creation/validation plus refresh/session token management
 - MFA (TOTP/HOTP) with recovery codes and otpauth helpers
-- API key lifecycle management and validation
 - Passwordless (Magic Link / OTP) flows with in-memory stores
+- API key lifecycle management and validation
+- OAuth 2.0 clients with PKCE, scopes, and token introspection
+- WebAuthn/Passkeys flows for passwordless registration/authentication
+- RBAC policies and role utilities
+- Account safety rails (lockout, login tracking, IP banning) and secure cookies
+- CSRF protection, adaptive rate limiting, and audit logging
 - HKDF-based crypto helpers (SHA-256/SHA-512)
-- CSRF protection and adaptive rate limiting
 - Cargo feature flags to tailor footprint (`argon2`, `bcrypt`, `scrypt`, `jwt`, `mfa`, `api-key`, `passwordless`, `crypto`, `oauth`, `rbac`, `webauthn`, `full`)
 
 ## Project Structure
@@ -26,10 +30,14 @@ src/
   token/        # jwt.rs, refresh.rs, session.rs
   mfa/          # TOTP/HOTP + recovery modules
   passwordless/ # Magic Link & OTP helpers
+  oauth/        # OAuth2 clients, PKCE, token handling
+  rbac/         # Role/policy helpers
+  webauthn/     # Passkey flows and validation
   crypto/       # HKDF key derivation helpers
   api_key/      # API key lifecycle management
-  security/     # csrf.rs, rate_limit.rs
+  security/     # csrf.rs, rate_limit.rs, account.rs (lockout), cookie.rs
   random.rs     # Secure RNG helpers
+  audit.rs      # Security event logging utilities
 ```
 
 ## Getting Started
@@ -58,17 +66,17 @@ println!("subject={}", claims.sub.unwrap_or_default());
 ## Feature Flags
 - Defaults: `argon2`, `jwt`, `mfa`
 - Optional: `bcrypt`, `scrypt`, `oauth`, `rbac`, `webauthn`, `passwordless`, `crypto`, `api-key`
-- `full` turns on every optional module
+- `full` turns on every optional module (including OAuth, RBAC, WebAuthn)
 - Combine selectively via `cargo build --no-default-features --features jwt,scrypt`
 
 ## Development Workflow
 ```bash
 cargo fmt                                  # Format with rustfmt
 cargo clippy --all-targets --all-features  # Run static analysis
-cargo test --all-features                  # Execute test suite
+cargo test --features full                 # Execute full-feature test suite
 cargo doc --open                           # Build API docs
 ```
-Place unit tests alongside modules, and integration tests under `tests/` when composing flows. Prefer deterministic RNG (`StdRng::seed_from_u64`) for assertions; reserve `OsRng` for production randomness.
+Place unit tests alongside modules, and integration tests under `tests/` when composing flows. Prefer deterministic RNG (`StdRng::seed_from_u64`) for assertions; reserve `OsRng` for production randomness. Use feature-specific flags to validate gated paths (e.g., `--features oauth` or `--features webauthn`).
 
 ## Security Notes
 - Never commit secrets or sample JWT keys—load them via ignored config or environment variables.

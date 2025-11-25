@@ -3,17 +3,21 @@
 [English README](README.md)
 
 ## 项目简介
-AuthRS 是一个基于 Rust 2024 的认证工具包，整合了密码哈希、JWT/Session、MFA、Passwordless（魔法链接/OTP）、CSRF、速率限制以及安全随机工具，帮助你快速构建可靠且安全的认证流程。
+AuthRS 是一个基于 Rust 2024 的认证工具包，整合了密码哈希、JWT/Session、MFA、Passwordless（魔法链接/OTP）、OAuth2 客户端、RBAC、WebAuthn/Passkeys、CSRF、速率限制、审计与安全随机工具，帮助你快速构建可靠且安全的认证流程。
 
 ## 功能特性
 - 密码哈希与强度校验（Argon2、bcrypt、scrypt、自定义策略）
 - 安全随机生成器与常量时间比较函数
 - JWT 生成/验证、Refresh Token 与 Session 管理
 - 支持 TOTP/HOTP 的多因素认证与恢复码
-- API Key 生命周期管理与校验
 - Passwordless（魔法链接/OTP）流程与内存存储实现
+- API Key 生命周期管理与校验
+- OAuth2 客户端与 PKCE、Scope、Token 内省
+- WebAuthn/Passkeys 的无密码注册与认证
+- RBAC 策略与角色工具
+- 账户安全防护（锁定、登录追踪、IP 封禁）与安全 Cookie
+- CSRF 防护、自适应速率限制与审计日志
 - 基于 HKDF 的密码学辅助函数（SHA-256/SHA-512）
-- CSRF 防护与自适应速率限制
 - 通过 Cargo Feature 精准裁剪（`argon2`、`bcrypt`、`scrypt`、`jwt`、`mfa`、`api-key`、`passwordless`、`crypto`、`oauth`、`rbac`、`webauthn`、`full`）
 
 ## 项目结构
@@ -26,10 +30,14 @@ src/
   token/        # jwt.rs、refresh.rs、session.rs
   mfa/          # TOTP/HOTP 与恢复模块
   passwordless/ # 魔法链接与 OTP 辅助模块
+  oauth/        # OAuth2 客户端、PKCE、Token 处理
+  rbac/         # 角色/策略工具
+  webauthn/     # Passkey 流程与校验
   crypto/       # HKDF 密钥派生辅助
   api_key/      # API Key 生命周期管理
-  security/     # csrf.rs、rate_limit.rs
+  security/     # csrf.rs、rate_limit.rs、account.rs（锁定）、cookie.rs
   random.rs     # 安全随机与比较工具
+  audit.rs      # 安全事件审计工具
 ```
 
 ## 快速开始
@@ -58,17 +66,17 @@ println!("subject={}", claims.sub.unwrap_or_default());
 ## 功能开关
 - 默认启用：`argon2`、`jwt`、`mfa`
 - 可选：`bcrypt`、`scrypt`、`oauth`、`rbac`、`webauthn`、`passwordless`、`crypto`、`api-key`
-- `full` 打开全部可选模块
+- `full` 打开全部可选模块（包含 OAuth、RBAC、WebAuthn 等）
 - 通过 `cargo build --no-default-features --features jwt,scrypt` 仅编译所需模块
 
 ## 开发流程
 ```bash
 cargo fmt                                  # rustfmt 格式化
 cargo clippy --all-targets --all-features  # 静态检查
-cargo test --all-features                  # 运行测试
+cargo test --features full                 # 全特性测试
 cargo doc --open                           # 构建 API 文档
 ```
-单元测试建议与模块放在一起；组合多个模块的端到端流程放在 `tests/` 目录。需要稳定断言时可使用 `StdRng::seed_from_u64` 提供确定随机性，生产环境仍使用 `OsRng`。
+单元测试建议与模块放在一起；组合多个模块的端到端流程放在 `tests/` 目录。需要稳定断言时可使用 `StdRng::seed_from_u64` 提供确定随机性，生产环境仍使用 `OsRng`。针对受特性保护的路径，使用对应标志验证（如 `--features oauth` 或 `--features webauthn`）。
 
 ## 安全提示
 - 不要提交任何密钥或示例 JWT，改用环境变量或被忽略的配置文件。
