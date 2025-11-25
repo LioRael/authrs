@@ -256,20 +256,41 @@ pub struct NoOpAuditLogger { ... }   // ✅ 空操作实现
 
 ```toml
 [features]
-# 现有
+# 默认组合
 default = ["argon2", "jwt", "mfa"]
+
+# 密码哈希
 argon2 = ["dep:argon2"]
 bcrypt = ["dep:bcrypt"]
+
+# Token / MFA
 jwt = ["dep:jsonwebtoken"]
 mfa = ["dep:sha1"]
-full = ["argon2", "bcrypt", "jwt", "mfa"]
+
+# 已有可选模块
+oauth = []
+rbac = []
+webauthn = ["dep:url", "dep:webauthn-rs"]
+passwordless = []
+crypto = []
+api-key = []
 
 # 计划新增
 scrypt = ["dep:scrypt"]
-oauth = ["dep:oauth2"]
-webauthn = ["dep:url", "dep:webauthn-rs"]
-rbac = []
-passwordless = []
+
+# 完整功能集合
+full = [
+    "argon2",
+    "bcrypt",
+    "jwt",
+    "mfa",
+    "oauth",
+    "rbac",
+    "webauthn",
+    "passwordless",
+    "crypto",
+    "api-key",
+]
 ```
 
 ---
