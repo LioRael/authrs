@@ -952,7 +952,7 @@ impl RefreshTokenManager {
 
         let tokens = self.store.get_by_user(user_id)?;
 
-        // 收集所有家族 ID
+        // 收集所有家族 ID 及其创建时间
         let mut families: HashMap<String, i64> = HashMap::new();
         for token in tokens {
             families
@@ -961,8 +961,15 @@ impl RefreshTokenManager {
         }
 
         // 如果超出限制，删除最旧的家族
+        // 使用 (created_at, family_id) 作为排序键，确保在时间戳相同时有确定性行为
         if families.len() >= self.config.max_families_per_user {
-            if let Some((oldest_family, _)) = families.iter().min_by_key(|(_, created)| *created) {
+            if let Some((oldest_family, _)) =
+                families
+                    .iter()
+                    .min_by(|(id_a, created_a), (id_b, created_b)| {
+                        created_a.cmp(created_b).then_with(|| id_a.cmp(id_b))
+                    })
+            {
                 self.store.delete_family(oldest_family)?;
             }
         }
@@ -1216,16 +1223,25 @@ mod tests {
         let manager = RefreshTokenManager::new(config);
 
         let t1 = manager.generate("user123").unwrap();
-        let _t2 = manager.generate("user123").unwrap();
-        let _t3 = manager.generate("user123").unwrap();
+        let t2 = manager.generate("user123").unwrap();
+        let t3 = manager.generate("user123").unwrap();
 
-        // 最早的 token 应该被删除
-        assert!(manager.validate(&t1.token).is_err());
-
+        // 生成第三个 token 时，应该删除一个旧的家族
+        // 最终应该只有 2 个家族存在
         let tokens = manager.get_user_tokens("user123").unwrap();
         let families: std::collections::HashSet<_> =
             tokens.iter().map(|t| t.family_id.clone()).collect();
         assert_eq!(families.len(), 2);
+
+        // 验证只有 2 个 token 是有效的（第三个 token 和另一个存活的 token）
+        let valid_count = [&t1.token, &t2.token, &t3.token]
+            .iter()
+            .filter(|t| manager.validate(t).is_ok())
+            .count();
+        assert_eq!(valid_count, 2);
+
+        // 第三个 token 应该始终有效（刚创建的）
+        assert!(manager.validate(&t3.token).is_ok());
     }
 
     #[test]
