@@ -2,6 +2,8 @@
 //!
 //! 测试角色定义、权限检查、策略引擎等完整流程。
 
+#![cfg(feature = "rbac")]
+
 use authrs::rbac::{
     Action, Permission, PermissionSet, Policy, PolicyEffect, PolicyEngine, PolicyEvaluator,
     Resource, RoleBuilder, RoleManager, Subject,

@@ -459,7 +459,7 @@ fn test_api_key_full_lifecycle() {
     );
 
     // === 阶段5：撤销 ===
-    manager.revoke(&new_key_id);
+    let _ = manager.revoke(&new_key_id);
     assert!(manager.validate(&new_plain_key).is_none());
 
     // === 阶段6：删除 ===
@@ -515,7 +515,7 @@ fn test_api_key_disable_enable() {
 fn test_api_key_display_hint() {
     let manager = ApiKeyManager::with_default_config();
 
-    let (key, plain_key) = manager
+    let (key, _plain_key) = manager
         .create_key("hint-service")
         .with_prefix("sk_hint")
         .build()

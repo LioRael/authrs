@@ -345,7 +345,7 @@ fn test_is_auth_event() {
     let logout = SecurityEvent::logout("user_3");
     assert!(logout.is_auth_event());
 
-    let mfa_event = SecurityEvent::mfa_enabled("user_4");
+    let _mfa_event = SecurityEvent::mfa_enabled("user_4");
     // MFA events may or may not be considered auth events depending on implementation
 
     let api_key_event = SecurityEvent::api_key_created("user_5", "key_123");

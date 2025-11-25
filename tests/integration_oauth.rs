@@ -2,6 +2,8 @@
 //!
 //! 测试 OAuth 客户端管理、PKCE、Token 响应等完整流程。
 
+#![cfg(feature = "oauth")]
+
 use authrs::oauth::{
     ClientType, GrantType, InMemoryClientStore, IntrospectionRequest, IntrospectionResponse,
     OAuthClient, OAuthClientStore, PkceChallenge, PkceMethod, TokenResponse,

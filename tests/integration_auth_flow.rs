@@ -7,10 +7,10 @@ use authrs::security::account::{LoginAttemptTracker, LoginCheckResult};
 use authrs::security::csrf::CsrfProtection;
 use authrs::security::rate_limit::{RateLimitConfig, RateLimiter};
 use authrs::token::session::{SessionConfig, SessionManager};
-use chrono::Duration as ChronoDuration;
 use std::time::Duration;
 
 /// 模拟用户数据
+#[allow(dead_code)]
 struct MockUser {
     id: String,
     username: String,
