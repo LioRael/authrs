@@ -47,10 +47,7 @@ impl Default for Algorithm {
         {
             Algorithm::Bcrypt
         }
-        #[cfg(all(
-            not(any(feature = "argon2", feature = "bcrypt")),
-            feature = "scrypt"
-        ))]
+        #[cfg(all(not(any(feature = "argon2", feature = "bcrypt")), feature = "scrypt"))]
         {
             Algorithm::Scrypt
         }
@@ -333,13 +330,7 @@ impl PasswordHasher {
         })?;
 
         Scrypt
-            .hash_password_customized(
-                password.as_bytes(),
-                None,
-                None,
-                self.scrypt_params,
-                &salt,
-            )
+            .hash_password_customized(password.as_bytes(), None, None, self.scrypt_params, &salt)
             .map(|h| h.to_string())
             .map_err(|e| {
                 Error::PasswordHash(PasswordHashError::HashFailed(format!(

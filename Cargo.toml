@@ -47,22 +47,22 @@ api-key = []
 
 # 完整功能
 full = [
+    "api-key",
     "argon2",
     "bcrypt",
-    "scrypt",
+    "crypto",
     "jwt",
     "mfa",
     "oauth",
-    "rbac",
-    "webauthn",
     "passwordless",
-    "crypto",
-    "api-key",
+    "rbac",
+    "scrypt",
+    "webauthn",
 ]
 
 [dependencies]
 # 密码哈希 (可选)
-argon2 = { version = "0.6.0-rc.2", optional = true }
+argon2 = { version = "0.5", optional = true }
 bcrypt = { version = "0.17", optional = true }
 scrypt = { version = "0.11", optional = true }
 
