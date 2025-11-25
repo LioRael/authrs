@@ -13,6 +13,9 @@
 //! - **MFA**: TOTP/HOTP 多因素认证
 //! - **速率限制**: 防止暴力破解攻击
 //! - **CSRF 防护**: 跨站请求伪造防护
+//! - **OAuth 2.0**: OAuth 客户端、PKCE、Token 内省
+//! - **API Key 管理**: 完整的 API Key 生命周期管理
+//! - **账户安全**: 账户锁定、登录追踪、递增延迟
 //!
 //! ## Features
 //!
@@ -88,9 +91,84 @@
 //!     println!("User: {}", s.user_id);
 //! }
 //! ```
+//!
+//! ## OAuth 2.0 示例
+//!
+//! ```rust
+//! use authrs::oauth::{OAuthClient, ClientType, GrantType, PkceChallenge, PkceMethod};
+//!
+//! // 创建 OAuth 客户端
+//! let (client, secret) = OAuthClient::builder()
+//!     .name("My Application")
+//!     .client_type(ClientType::Confidential)
+//!     .redirect_uri("https://example.com/callback")
+//!     .grant_type(GrantType::AuthorizationCode)
+//!     .scope("read")
+//!     .build()
+//!     .unwrap();
+//!
+//! // 生成 PKCE challenge
+//! let pkce = PkceChallenge::new(PkceMethod::S256).unwrap();
+//! let (code_challenge, method) = pkce.authorization_params();
+//! ```
+//!
+//! ## API Key 管理示例
+//!
+//! ```rust
+//! use authrs::api_key::{ApiKeyManager, ApiKeyConfig};
+//!
+//! // 创建管理器
+//! let mut manager = ApiKeyManager::with_default_config();
+//!
+//! // 创建 API Key
+//! let (key, plain_key) = manager.create_key("my-service")
+//!     .with_prefix("sk_live")
+//!     .with_scope("read")
+//!     .with_expires_in_days(90)
+//!     .build()
+//!     .unwrap();
+//!
+//! manager.add_key(key);
+//!
+//! // 验证 API Key
+//! if let Some(validated) = manager.validate(&plain_key) {
+//!     println!("Key is valid, owner: {}", validated.owner);
+//! }
+//! ```
+//!
+//! ## 账户锁定示例
+//!
+//! ```rust
+//! use authrs::security::account::{LoginAttemptTracker, AccountLockoutConfig, LoginCheckResult};
+//!
+//! // 创建追踪器
+//! let mut tracker = LoginAttemptTracker::with_default_config();
+//!
+//! // 检查是否允许登录
+//! match tracker.check_login_allowed("user123", None) {
+//!     LoginCheckResult::Allowed => {
+//!         // 允许登录尝试
+//!         // 如果登录失败：
+//!         tracker.record_failed_attempt("user123", None);
+//!         // 如果登录成功：
+//!         // tracker.record_successful_login("user123", None);
+//!     }
+//!     LoginCheckResult::Locked { reason, remaining } => {
+//!         println!("账户已锁定: {:?}", reason);
+//!     }
+//!     LoginCheckResult::DelayRequired { wait_time } => {
+//!         println!("请等待 {:?} 后重试", wait_time);
+//!     }
+//!     LoginCheckResult::IpBanned { ip } => {
+//!         println!("IP {} 已被封禁", ip);
+//!     }
+//! }
+//! ```
 
+pub mod api_key;
 pub mod error;
 pub mod mfa;
+pub mod oauth;
 pub mod password;
 pub mod random;
 pub mod security;
@@ -145,5 +223,51 @@ pub use mfa::totp::{TotpConfig, TotpManager, TotpSecret};
 // 安全防护相关导出
 // ============================================================================
 
+pub use security::account::{
+    AccountLockStatus, AccountLockStore, AccountLockoutConfig, InMemoryAccountLockStore,
+    LockReason, LoginAttempt, LoginAttemptTracker, LoginCheckResult, TrackerStats,
+};
 pub use security::csrf::{CsrfConfig, CsrfProtection, CsrfToken};
 pub use security::rate_limit::{RateLimitConfig, RateLimitInfo, RateLimiter};
+
+// ============================================================================
+// OAuth 2.0 相关导出
+// ============================================================================
+
+pub use oauth::{
+    // Token
+    AccessToken,
+    // Client
+    ClientType,
+    GrantType,
+    InMemoryClientStore,
+    // Introspection
+    IntrospectionRequest,
+    IntrospectionResponse,
+    IntrospectionResponseBuilder,
+    OAuthClient,
+    OAuthClientBuilder,
+    OAuthClientStore,
+    OAuthError,
+    OAuthErrorCode,
+    OAuthRefreshToken,
+    // PKCE
+    PkceChallenge,
+    PkceCodeChallenge,
+    PkceConfig,
+    PkceMethod,
+    PkceVerifier,
+    TokenIntrospector,
+    TokenResponse,
+    TokenType,
+    TokenTypeHint,
+};
+
+// ============================================================================
+// API Key 管理相关导出
+// ============================================================================
+
+pub use api_key::{
+    ApiKey, ApiKeyBuilder, ApiKeyConfig, ApiKeyManager, ApiKeyStats, ApiKeyStatus, ApiKeyStore,
+    InMemoryApiKeyStore,
+};

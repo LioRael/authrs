@@ -6,6 +6,7 @@
 //!
 //! - **rate_limit**: 速率限制，防止暴力破解
 //! - **csrf**: CSRF (跨站请求伪造) 防护
+//! - **account**: 账户安全，包括锁定机制和登录追踪
 //!
 //! ## 速率限制示例
 //!
@@ -44,9 +45,49 @@
 //! let is_valid = csrf.verify(&token.token).unwrap();
 //! assert!(is_valid);
 //! ```
+//!
+//! ## 账户锁定示例
+//!
+//! ```rust
+//! use authrs::security::account::{LoginAttemptTracker, AccountLockoutConfig, LoginCheckResult};
+//!
+//! // 创建登录追踪器
+//! let mut tracker = LoginAttemptTracker::with_default_config();
+//!
+//! // 检查是否允许登录
+//! match tracker.check_login_allowed("user@example.com", None) {
+//!     LoginCheckResult::Allowed => {
+//!         // 允许登录尝试
+//!         println!("Login attempt allowed");
+//!     }
+//!     LoginCheckResult::Locked { reason, remaining } => {
+//!         // 账户被锁定
+//!         println!("Account locked: {:?}", reason);
+//!     }
+//!     LoginCheckResult::DelayRequired { wait_time } => {
+//!         // 需要等待
+//!         println!("Please wait {:?}", wait_time);
+//!     }
+//!     LoginCheckResult::IpBanned { ip } => {
+//!         // IP 被封禁
+//!         println!("IP banned: {}", ip);
+//!     }
+//! }
+//!
+//! // 记录失败登录
+//! tracker.record_failed_attempt("user@example.com", None);
+//!
+//! // 记录成功登录（重置失败计数）
+//! tracker.record_successful_login("user@example.com", None);
+//! ```
 
+pub mod account;
 pub mod csrf;
 pub mod rate_limit;
 
+pub use account::{
+    AccountLockStatus, AccountLockStore, AccountLockoutConfig, InMemoryAccountLockStore,
+    LockReason, LoginAttempt, LoginAttemptTracker, LoginCheckResult,
+};
 pub use csrf::{CsrfConfig, CsrfProtection, CsrfToken};
 pub use rate_limit::{RateLimitConfig, RateLimitInfo, RateLimiter};
