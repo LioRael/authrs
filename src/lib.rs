@@ -122,8 +122,13 @@ pub use random::{
 pub use token::jwt::{
     Claims, JwtAlgorithm, JwtBuilder, JwtValidator, TokenPair, TokenPairGenerator,
 };
-pub use token::refresh::{RefreshConfig, RefreshToken, RefreshTokenManager};
-pub use token::session::{Session, SessionConfig, SessionManager, SessionStore};
+pub use token::refresh::{
+    RefreshConfig, RefreshToken, RefreshTokenManager, RefreshTokenStore, TokenUseResult,
+};
+pub use token::session::{
+    CreateSessionOptions, InMemorySessionStore, Session, SessionConfig, SessionManager,
+    SessionStore,
+};
 
 // ============================================================================
 // MFA 相关导出

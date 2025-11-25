@@ -76,10 +76,21 @@ pub mod jwt;
 pub mod refresh;
 pub mod session;
 
+// JWT 导出
 #[cfg(feature = "jwt")]
 pub use jwt::{
     Claims, JwtAlgorithm, JwtBuilder, JwtValidator, JwtValidatorConfig, TokenPair,
     TokenPairGenerator,
 };
-pub use refresh::{RefreshConfig, RefreshToken, RefreshTokenManager};
-pub use session::{Session, SessionConfig, SessionManager, SessionStore};
+
+// Refresh Token 导出
+pub use refresh::{
+    GenerateOptions as RefreshGenerateOptions, RefreshConfig, RefreshToken, RefreshTokenManager,
+    RefreshTokenStore, TokenUseResult,
+};
+
+// Session 导出
+pub use session::{
+    CreateSessionOptions, InMemorySessionStore, Session, SessionConfig, SessionManager,
+    SessionStore,
+};
