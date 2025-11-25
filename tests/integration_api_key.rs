@@ -1,3 +1,5 @@
+#![cfg(feature = "api-key")]
+
 //! 集成测试：API Key 管理
 //!
 //! 测试 API Key 的创建、验证、轮换、权限检查等完整流程。

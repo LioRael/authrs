@@ -3,15 +3,18 @@
 [中文版 README](README.zh-CN.md)
 
 ## Overview
-AuthRS is a Rust 2024 authentication toolkit that consolidates password hashing, JWT/session tokens, MFA, CSRF, rate limiting, and secure randomness utilities so you can assemble robust auth flows without re-implementing primitives.
+AuthRS is a Rust 2024 authentication toolkit that consolidates password hashing, JWT/session tokens, MFA, passwordless (Magic Link / OTP), CSRF, rate limiting, and secure randomness utilities so you can assemble robust auth flows without re-implementing primitives.
 
 ## Features
 - Password hashing and strength validation (Argon2, bcrypt, policy helpers)
 - Secure random generators and constant-time comparison helpers
 - JWT creation/validation plus refresh/session token management
 - MFA (TOTP/HOTP) with recovery codes and otpauth helpers
+- API key lifecycle management and validation
+- Passwordless (Magic Link / OTP) flows with in-memory stores
+- HKDF-based crypto helpers (SHA-256/SHA-512)
 - CSRF protection and adaptive rate limiting
-- Cargo feature flags to tailor footprint (`argon2`, `bcrypt`, `jwt`, `mfa`, `full`)
+- Cargo feature flags to tailor footprint (`argon2`, `bcrypt`, `jwt`, `mfa`, `api-key`, `passwordless`, `crypto`, `oauth`, `rbac`, `webauthn`, `full`)
 
 ## Project Structure
 ```
@@ -22,6 +25,9 @@ src/
   password/     # Hashers + strength rules
   token/        # jwt.rs, refresh.rs, session.rs
   mfa/          # TOTP/HOTP + recovery modules
+  passwordless/ # Magic Link & OTP helpers
+  crypto/       # HKDF key derivation helpers
+  api_key/      # API key lifecycle management
   security/     # csrf.rs, rate_limit.rs
   random.rs     # Secure RNG helpers
 ```
@@ -32,7 +38,7 @@ cargo add authrs                # Add as a dependency
 cargo build                     # Build with default features
 cargo test --features full      # Run tests with all modules
 ```
-Use `--no-default-features --features <list>` to mix modules precisely (e.g., `cargo build --no-default-features --features jwt,password`).
+Use `--no-default-features --features <list>` to mix modules precisely (e.g., `cargo build --no-default-features --features jwt,passwordless`).
 
 ## Example
 ```rust
@@ -51,8 +57,9 @@ println!("subject={}", claims.sub.unwrap_or_default());
 
 ## Feature Flags
 - Defaults: `argon2`, `jwt`, `mfa`
-- `bcrypt` enables bcrypt hashing; `full` turns on every optional module
-- Combine selectively via `cargo build --no-default-features --features jwt,password`
+- Optional: `bcrypt`, `oauth`, `rbac`, `webauthn`, `passwordless`, `crypto`, `api-key`
+- `full` turns on every optional module
+- Combine selectively via `cargo build --no-default-features --features jwt,api-key`
 
 ## Development Workflow
 ```bash

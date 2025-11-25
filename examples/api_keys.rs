@@ -2,7 +2,7 @@
 //!
 //! 展示如何使用 AuthRS 实现 API Key 的创建、验证、权限检查和生命周期管理。
 //!
-//! 运行: cargo run --example api_keys --features full
+//! 运行: cargo run --example api_keys --features api-key
 
 use authrs::api_key::{ApiKeyConfig, ApiKeyManager};
 

@@ -29,14 +29,34 @@ mfa = ["dep:sha1"]
 # WebAuthn / Passkeys 支持
 webauthn = ["dep:url", "dep:webauthn-rs"]
 
+# Passwordless 支持（Magic Link / OTP）
+passwordless = []
+
+# 密码学工具（HKDF 等）
+crypto = []
+
 # OAuth 2.0 支持
 oauth = []
 
 # RBAC (角色权限管理) 支持
 rbac = []
 
+# API Key 支持
+api-key = []
+
 # 完整功能
-full = ["argon2", "bcrypt", "jwt", "mfa", "oauth", "rbac", "webauthn"]
+full = [
+    "argon2",
+    "bcrypt",
+    "jwt",
+    "mfa",
+    "oauth",
+    "rbac",
+    "webauthn",
+    "passwordless",
+    "crypto",
+    "api-key",
+]
 
 [dependencies]
 # 密码哈希 (可选)
@@ -104,3 +124,7 @@ required-features = ["jwt"]
 [[example]]
 name = "mfa_setup"
 required-features = ["mfa"]
+
+[[example]]
+name = "api_keys"
+required-features = ["api-key"]

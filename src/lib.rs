@@ -21,6 +21,8 @@
 //! - **审计日志**: 安全事件记录与查询
 //! - **安全 Cookie**: Cookie 签名、验证与安全属性管理
 //! - **密钥派生**: HKDF-SHA256/SHA512 密钥派生函数
+//! - **Passwordless**: Magic Link 与 OTP 支持
+//! - **API Key 管理**: API Key 生命周期管理与校验
 //!
 //! ## Features
 //!
@@ -33,6 +35,9 @@
 //! - `oauth` - 启用 OAuth 2.0 支持（PKCE、客户端管理、Token 内省）
 //! - `rbac` - 启用 RBAC 角色权限管理支持
 //! - `webauthn` - 启用 WebAuthn / Passkeys 支持
+//! - `passwordless` - 启用 Magic Link / OTP 无密码认证支持
+//! - `crypto` - 启用密码学工具（HKDF 等）
+//! - `api-key` - 启用 API Key 管理支持
 //! - `full` - 启用所有功能
 //!
 //! 默认启用的 features: `argon2`, `jwt`, `mfa`
@@ -123,7 +128,8 @@
 //!
 //! ## API Key 管理示例
 //!
-//! ```rust
+#![cfg_attr(feature = "api-key", doc = "```rust")]
+#![cfg_attr(not(feature = "api-key"), doc = "```rust,ignore")]
 //! use authrs::api_key::{ApiKeyManager, ApiKeyConfig};
 //!
 //! // 创建管理器
@@ -241,14 +247,17 @@
 //! assert!(engine.check_permission(&user, "posts", "read"));
 //! ```
 
+#[cfg(feature = "api-key")]
 pub mod api_key;
 pub mod audit;
+#[cfg(feature = "crypto")]
 pub mod crypto;
 pub mod error;
 pub mod mfa;
 #[cfg(feature = "oauth")]
 pub mod oauth;
 pub mod password;
+#[cfg(feature = "passwordless")]
 pub mod passwordless;
 pub mod random;
 #[cfg(feature = "rbac")]
@@ -364,6 +373,7 @@ pub use oauth::{
 // API Key 管理相关导出
 // ============================================================================
 
+#[cfg(feature = "api-key")]
 pub use api_key::{
     ApiKey, ApiKeyBuilder, ApiKeyConfig, ApiKeyManager, ApiKeyStats, ApiKeyStatus, ApiKeyStore,
     InMemoryApiKeyStore,
@@ -415,6 +425,7 @@ pub use webauthn::{
 // 密码学工具相关导出
 // ============================================================================
 
+#[cfg(feature = "crypto")]
 pub use crypto::kdf::{
     Hkdf, HkdfAlgorithm, derive_key_from_password, derive_subkeys, hkdf_sha256, hkdf_sha512,
 };
@@ -423,6 +434,7 @@ pub use crypto::kdf::{
 // Passwordless 认证相关导出
 // ============================================================================
 
+#[cfg(feature = "passwordless")]
 pub use passwordless::{
     // Magic Link
     InMemoryMagicLinkStore,

@@ -1,3 +1,5 @@
+#![cfg(feature = "passwordless")]
+
 //! Passwordless 认证模块集成测试
 //!
 //! 测试 Magic Link 和 OTP 功能的各种使用场景。

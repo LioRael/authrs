@@ -3,15 +3,18 @@
 [English README](README.md)
 
 ## 项目简介
-AuthRS 是一个基于 Rust 2024 的认证工具包，整合了密码哈希、JWT/Session、MFA、CSRF、速率限制以及安全随机工具，帮助你快速构建可靠且安全的认证流程。
+AuthRS 是一个基于 Rust 2024 的认证工具包，整合了密码哈希、JWT/Session、MFA、Passwordless（魔法链接/OTP）、CSRF、速率限制以及安全随机工具，帮助你快速构建可靠且安全的认证流程。
 
 ## 功能特性
 - 密码哈希与强度校验（Argon2、bcrypt、自定义策略）
 - 安全随机生成器与常量时间比较函数
 - JWT 生成/验证、Refresh Token 与 Session 管理
 - 支持 TOTP/HOTP 的多因素认证与恢复码
+- API Key 生命周期管理与校验
+- Passwordless（魔法链接/OTP）流程与内存存储实现
+- 基于 HKDF 的密码学辅助函数（SHA-256/SHA-512）
 - CSRF 防护与自适应速率限制
-- 通过 Cargo Feature 精准裁剪（`argon2`、`bcrypt`、`jwt`、`mfa`、`full`）
+- 通过 Cargo Feature 精准裁剪（`argon2`、`bcrypt`、`jwt`、`mfa`、`api-key`、`passwordless`、`crypto`、`oauth`、`rbac`、`webauthn`、`full`）
 
 ## 项目结构
 ```
@@ -22,6 +25,9 @@ src/
   password/     # 哈希与强度规则
   token/        # jwt.rs、refresh.rs、session.rs
   mfa/          # TOTP/HOTP 与恢复模块
+  passwordless/ # 魔法链接与 OTP 辅助模块
+  crypto/       # HKDF 密钥派生辅助
+  api_key/      # API Key 生命周期管理
   security/     # csrf.rs、rate_limit.rs
   random.rs     # 安全随机与比较工具
 ```
@@ -32,7 +38,7 @@ cargo add authrs                # 添加依赖
 cargo build                     # 默认特性编译
 cargo test --features full      # 全特性测试
 ```
-通过 `--no-default-features --features <列表>` 精准组合模块（例：`cargo build --no-default-features --features jwt,password`）。
+通过 `--no-default-features --features <列表>` 精准组合模块（例：`cargo build --no-default-features --features jwt,passwordless`）。
 
 ## 使用示例
 ```rust
@@ -51,8 +57,9 @@ println!("subject={}", claims.sub.unwrap_or_default());
 
 ## 功能开关
 - 默认启用：`argon2`、`jwt`、`mfa`
-- `bcrypt` 启用 bcrypt 哈希；`full` 打开全部可选模块
-- 通过 `cargo build --no-default-features --features jwt,password` 仅编译所需模块
+- 可选：`bcrypt`、`oauth`、`rbac`、`webauthn`、`passwordless`、`crypto`、`api-key`
+- `full` 打开全部可选模块
+- 通过 `cargo build --no-default-features --features jwt,api-key` 仅编译所需模块
 
 ## 开发流程
 ```bash
