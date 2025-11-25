@@ -171,23 +171,25 @@ pub fn delete_cookie_header(...) -> String;  // ✅ 删除 Cookie
 - [x] Set-Cookie 头生成
 - [x] 删除 Cookie 助手
 
-#### 8. 密钥派生函数
+#### 8. ~~密钥派生函数~~ ✅ 已完成
 
 ```rust
-// src/crypto/kdf.rs
+// src/crypto/kdf.rs ✅
 
-// HKDF 用于从主密钥派生子密钥
-pub fn hkdf_sha256(
-    secret: &[u8],
-    salt: Option<&[u8]>,
-    info: &[u8],
-    output_len: usize,
-) -> Result<Vec<u8>>;
+pub fn hkdf_sha256(...) -> Result<Vec<u8>>;  // ✅ HKDF-SHA256
+pub fn hkdf_sha512(...) -> Result<Vec<u8>>;  // ✅ HKDF-SHA512
+pub struct Hkdf { ... }                       // ✅ 构建器 API
+pub fn derive_key_from_password(...) -> Result<Vec<u8>>; // ✅ 密码派生
+pub fn derive_subkeys(...) -> Result<Vec<Vec<u8>>>;      // ✅ 批量派生
 ```
 
 **功能点：**
-- [ ] HKDF-SHA256
-- [ ] HKDF-SHA512
+- [x] HKDF-SHA256
+- [x] HKDF-SHA512
+- [x] 构建器 API (Hkdf)
+- [x] 从密码派生密钥
+- [x] 从主密钥派生多个子密钥
+- [x] RFC 5869 测试向量验证
 
 #### 9. ~~审计日志 Trait~~ ✅ 已完成
 

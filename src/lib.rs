@@ -20,6 +20,7 @@
 //! - **RBAC**: 角色权限管理、策略引擎
 //! - **审计日志**: 安全事件记录与查询
 //! - **安全 Cookie**: Cookie 签名、验证与安全属性管理
+//! - **密钥派生**: HKDF-SHA256/SHA512 密钥派生函数
 //!
 //! ## Features
 //!
@@ -242,6 +243,7 @@
 
 pub mod api_key;
 pub mod audit;
+pub mod crypto;
 pub mod error;
 pub mod mfa;
 #[cfg(feature = "oauth")]
@@ -406,6 +408,14 @@ pub use webauthn::{
     WebAuthnServiceError,
     Webauthn,
     WebauthnBuilder,
+};
+
+// ============================================================================
+// 密码学工具相关导出
+// ============================================================================
+
+pub use crypto::kdf::{
+    Hkdf, HkdfAlgorithm, derive_key_from_password, derive_subkeys, hkdf_sha256, hkdf_sha512,
 };
 
 // ============================================================================
