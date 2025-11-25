@@ -9,7 +9,7 @@
 | **password/** | Argon2/bcrypt 哈希、密码强度验证 | ✅ 完成 |
 | **token/** | JWT (多算法)、Refresh Token、Session 管理 | ✅ 完成 |
 | **mfa/** | TOTP/HOTP、恢复码 | ✅ 完成 |
-| **security/** | CSRF 防护、速率限制 (滑动窗口/固定窗口/令牌桶) | ✅ 完成 |
+| **security/** | CSRF 防护、速率限制 (滑动窗口/固定窗口/令牌桶)、安全 Cookie | ✅ 完成 |
 | **security/account** | 账户锁定、登录追踪、递增延迟、IP 封禁 | ✅ 完成 |
 | **oauth/** | OAuth 客户端管理、PKCE (S256/plain)、Token 内省 | ✅ 完成 |
 | **api_key/** | API Key 管理（哈希存储、权限范围、过期、轮换） | ✅ 完成 |
@@ -17,6 +17,7 @@
 | **rbac/** | 角色权限管理、策略引擎 | ✅ 完成 |
 | **random.rs** | 安全随机数、常量时间比较 | ✅ 完成 |
 | **error.rs** | 统一错误类型 | ✅ 完成 |
+| **audit.rs** | 审计日志、安全事件记录 | ✅ 完成 |
 
 ---
 
@@ -151,28 +152,24 @@ src/passwordless/
 - [ ] Email OTP
 - [ ] SMS OTP
 
-#### 7. 安全 Cookie 助手
+#### 7. ~~安全 Cookie 助手~~ ✅ 已完成
 
 ```rust
-// security/cookie.rs
+// security/cookie.rs ✅
 
-pub struct SecureCookie {
-    pub name: String,
-    pub value: String,
-    pub http_only: bool,
-    pub secure: bool,
-    pub same_site: SameSite,
-    pub max_age: Option<Duration>,
-}
-
-pub fn sign_cookie(value: &str, secret: &[u8]) -> String;
-pub fn verify_cookie(signed: &str, secret: &[u8]) -> Result<String>;
+pub struct SecureCookie { ... }  // ✅ Cookie 结构体
+pub enum SameSite { ... }        // ✅ SameSite 属性
+pub fn sign_cookie(...) -> String;     // ✅ Cookie 签名
+pub fn verify_cookie(...) -> Result<String>; // ✅ Cookie 验证
+pub fn delete_cookie_header(...) -> String;  // ✅ 删除 Cookie
 ```
 
 **功能点：**
-- [ ] Cookie 签名
-- [ ] Cookie 验证
-- [ ] 安全属性封装
+- [x] Cookie 签名 (HMAC-SHA256)
+- [x] Cookie 验证
+- [x] 安全属性封装 (HttpOnly, Secure, SameSite, Max-Age, Path, Domain)
+- [x] Set-Cookie 头生成
+- [x] 删除 Cookie 助手
 
 #### 8. 密钥派生函数
 
@@ -192,28 +189,27 @@ pub fn hkdf_sha256(
 - [ ] HKDF-SHA256
 - [ ] HKDF-SHA512
 
-#### 9. 审计日志 Trait
+#### 9. ~~审计日志 Trait~~ ✅ 已完成
 
 ```rust
-// src/audit.rs
+// src/audit.rs ✅
 
-pub enum SecurityEvent {
-    LoginSuccess { user_id: String, ip: String },
-    LoginFailed { user_id: String, reason: String },
-    PasswordChanged { user_id: String },
-    MfaEnabled { user_id: String },
-    SuspiciousActivity { details: String },
-}
-
-pub trait AuditLogger {
-    fn log(&self, event: SecurityEvent);
-}
+pub enum EventType { ... }           // ✅ 事件类型枚举
+pub enum EventSeverity { ... }       // ✅ 严重程度枚举
+pub struct SecurityEvent { ... }     // ✅ 安全事件结构
+pub trait AuditLogger { ... }        // ✅ 日志 Trait
+pub struct InMemoryAuditLogger { ... } // ✅ 内存实现
+pub struct NoOpAuditLogger { ... }   // ✅ 空操作实现
 ```
 
 **功能点：**
-- [ ] 安全事件枚举
-- [ ] 日志 Trait 定义
-- [ ] 简单内存实现（用于测试）
+- [x] 安全事件枚举 (登录、MFA、账户锁定、API Key 等)
+- [x] 严重程度分级 (Debug, Info, Warning, Error, Critical)
+- [x] 日志 Trait 定义
+- [x] 内存实现（支持过滤、查询、统计）
+- [x] 空操作实现（用于禁用审计）
+- [x] 便捷构造方法
+- [x] 事件序列化
 
 #### 10. scrypt 密码哈希
 
@@ -270,6 +266,8 @@ passwordless = []
 - [x] API Key 管理增强
 - [x] WebAuthn/Passkeys 支持
 - [x] RBAC 模块（角色权限管理、策略引擎）
+- [x] 审计日志模块
+- [x] 安全 Cookie 助手
 - [ ] 集成测试
 
 ### v0.3.0

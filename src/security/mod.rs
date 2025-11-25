@@ -7,6 +7,7 @@
 //! - **rate_limit**: 速率限制，防止暴力破解
 //! - **csrf**: CSRF (跨站请求伪造) 防护
 //! - **account**: 账户安全，包括锁定机制和登录追踪
+//! - **cookie**: 安全 Cookie 助手，签名与验证
 //!
 //! ## 速率限制示例
 //!
@@ -82,6 +83,7 @@
 //! ```
 
 pub mod account;
+pub mod cookie;
 pub mod csrf;
 pub mod rate_limit;
 
@@ -89,5 +91,6 @@ pub use account::{
     AccountLockStatus, AccountLockStore, AccountLockoutConfig, InMemoryAccountLockStore,
     LockReason, LoginAttempt, LoginAttemptTracker, LoginCheckResult,
 };
+pub use cookie::{SameSite, SecureCookie, delete_cookie_header, sign_cookie, verify_cookie};
 pub use csrf::{CsrfConfig, CsrfProtection, CsrfToken};
 pub use rate_limit::{RateLimitConfig, RateLimitInfo, RateLimiter};

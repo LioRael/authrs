@@ -18,6 +18,8 @@
 //! - **账户安全**: 账户锁定、登录追踪、递增延迟
 //! - **WebAuthn / Passkeys**: 无密码认证支持
 //! - **RBAC**: 角色权限管理、策略引擎
+//! - **审计日志**: 安全事件记录与查询
+//! - **安全 Cookie**: Cookie 签名、验证与安全属性管理
 //!
 //! ## Features
 //!
@@ -239,6 +241,7 @@
 //! ```
 
 pub mod api_key;
+pub mod audit;
 pub mod error;
 pub mod mfa;
 #[cfg(feature = "oauth")]
@@ -305,8 +308,20 @@ pub use security::account::{
     AccountLockStatus, AccountLockStore, AccountLockoutConfig, InMemoryAccountLockStore,
     LockReason, LoginAttempt, LoginAttemptTracker, LoginCheckResult, TrackerStats,
 };
+pub use security::cookie::{
+    SameSite, SecureCookie, delete_cookie_header, sign_cookie, verify_cookie,
+};
 pub use security::csrf::{CsrfConfig, CsrfProtection, CsrfToken};
 pub use security::rate_limit::{RateLimitConfig, RateLimitInfo, RateLimiter};
+
+// ============================================================================
+// 审计日志相关导出
+// ============================================================================
+
+pub use audit::{
+    AuditLogger, AuditStats, EventSeverity, EventType, InMemoryAuditLogger, NoOpAuditLogger,
+    SecurityEvent,
+};
 
 // ============================================================================
 // OAuth 2.0 相关导出
