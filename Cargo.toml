@@ -2,13 +2,14 @@
 authors = ["LioRael <lioraeldev@gmail.com>"]
 categories = ["authentication", "cryptography"]
 description = "A comprehensive authentication library for Rust"
+documentation = "https://docs.rs/authrs"
 edition = "2024"
 exclude = ["benches/", "examples/", "tests/"]
 keywords = ["auth", "authentication", "jwt", "password", "security"]
 license = "MIT"
 name = "authrs"
 repository = "https://github.com/LioRael/authrs"
-version = "0.1.0"
+version = "0.1.1"
 
 [lib]
 doctest = true
